@@ -271,9 +271,9 @@ export default function Dashboard() {
                 <Calendar className="w-4 h-4" />
               </Link>
             ) : (
-              <Link to="/diagnosis" className="px-6 py-2.5 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 transition-all flex items-center gap-2">
-                Start AI Diagnosis
-                <ArrowUpRight className="w-4 h-4" />
+              <Link to="/appointments" className="px-6 py-2.5 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 transition-all flex items-center gap-2">
+                Book Appointment
+                <Calendar className="w-4 h-4" />
               </Link>
             )}
           </div>
@@ -312,7 +312,7 @@ export default function Dashboard() {
               <h3 className="text-xl font-bold text-slate-800">
                 {profile?.role === 'Doctor' ? 'Upcoming Appointments' : 'Recent AI Diagnoses'}
               </h3>
-              <Link to={profile?.role === 'Doctor' ? '/appointments' : '/diagnosis'} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">View All</Link>
+              <Link to={profile?.role === 'Doctor' ? '/appointments' : '/prescriptions'} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">View All</Link>
             </div>
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[200px]">
               {isLoading ? (
@@ -528,17 +528,17 @@ export default function Dashboard() {
                   <Users className="w-5 h-5" />
                   Manage Patients
                 </Link>
-                <Link to="/consultation" className="w-full py-4 bg-blue-50 text-blue-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-100 transition-all">
+                {/* <Link to="/consultation" className="w-full py-4 bg-blue-50 text-blue-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-100 transition-all">
                   <Video className="w-5 h-5" />
                   Start Video Call
-                </Link>
+                </Link> */}
               </div>
             </div>
           ) : (
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <Link to="/consultation" className="w-full py-4 bg-blue-50 text-blue-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-100 transition-all">
-                <Video className="w-5 h-5" />
-                Consult with Doctor
+              <Link to="/appointments" className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-emerald-100 transition-all">
+                <Calendar className="w-5 h-5" />
+                Book Appointment
               </Link>
               <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500">
                 <AlertCircle className="w-6 h-6" />

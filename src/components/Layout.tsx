@@ -34,18 +34,18 @@ function cn(...inputs: ClassValue[]) {
 const getNavItems = (role: string, subscribed: boolean) => {
   const items = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: Stethoscope, label: 'Diagnosis AI', path: '/diagnosis' },
+    // { icon: Stethoscope, label: 'Diagnosis AI', path: '/diagnosis' },
     { icon: UserCircle, label: role === 'Doctor' ? 'Doctor Profile' : 'Patient Profile', path: '/profile' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
     { icon: Calendar, label: 'Appointments', path: '/appointments' },
     { icon: Users, label: 'My Patients', path: '/patients', doctorOnly: true },
-    { icon: Video, label: 'Consultation', path: '/consultation' },
+    // { icon: Video, label: 'Consultation', path: '/consultation' },
     { icon: History, label: 'Call History', path: '/call-history' },
     { icon: FileText, label: 'Prescriptions', path: '/prescriptions' },
-    { icon: Store, label: 'Medical Store', path: '/store' },
+    // { icon: Store, label: 'Medical Store', path: '/store' },
     { icon: CreditCard, label: 'Payments', path: '/payments' },
-    { icon: ShieldCheck, label: 'Subscription', path: '/subscription' },
-    { icon: Users, label: 'Doctor Profiles', path: '/doctors' },
+    // { icon: ShieldCheck, label: 'Subscription', path: '/subscription' },
+    // { icon: Users, label: 'Doctor Profiles', path: '/doctors' },
   ];
 
   if (role === 'Admin') {
@@ -53,8 +53,7 @@ const getNavItems = (role: string, subscribed: boolean) => {
   }
 
   if (role === 'Doctor') {
-    // Doctors don't need Diagnosis AI (it's for patients) but they need all other features
-    return items.filter(item => !['/diagnosis'].includes(item.path || ''));
+    return items;
   }
   
   return items.filter(item => !item.doctorOnly);
