@@ -34,7 +34,7 @@ function cn(...inputs: ClassValue[]) {
 const getNavItems = (role: string, subscribed: boolean) => {
   const items = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    // { icon: Stethoscope, label: 'Diagnosis AI', path: '/diagnosis' },
+    // { icon: Stethoscope, label: 'Diagnosis', path: '/diagnosis' },
     { icon: UserCircle, label: role === 'Doctor' ? 'Doctor Profile' : 'Patient Profile', path: '/profile' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
     { icon: Calendar, label: 'Appointments', path: '/appointments' },
@@ -113,7 +113,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 bg-emerald-600 dark:bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-100 dark:shadow-none">
               <Activity className="w-5 h-5 animate-pulse" />
             </div>
-            {isSidebarOpen && <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-slate-100">Raihan TeleMed</span>}
+            {isSidebarOpen && <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-slate-100">Raihan Telemedicine</span>}
           </div>
           {/* Close button inside sidebar on mobile only */}
           {isSidebarOpen && (

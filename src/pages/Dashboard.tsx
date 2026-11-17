@@ -310,7 +310,7 @@ export default function Dashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between px-2">
               <h3 className="text-xl font-bold text-slate-800">
-                {profile?.role === 'Doctor' ? 'Upcoming Appointments' : 'Recent AI Diagnoses'}
+                {profile?.role === 'Doctor' ? 'Upcoming Appointments' : 'Recent Clinical Records'}
               </h3>
               <Link to={profile?.role === 'Doctor' ? '/appointments' : '/prescriptions'} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">View All</Link>
             </div>
@@ -358,7 +358,7 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <p className="font-bold text-slate-800">{activity.condition}</p>
-                        <p className="text-xs text-slate-500">AI Diagnosis • {activity.created_at ? new Date(activity.created_at).toLocaleDateString() : ''}</p>
+                        <p className="text-xs text-slate-500">Clinical Record • {activity.created_at ? new Date(activity.created_at).toLocaleDateString() : ''}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -443,25 +443,16 @@ export default function Dashboard() {
                 )}
               </div>
               <div>
-                <h4 className="font-bold text-lg">
-                  {profile?.subscribed ? 'Premium Member' : 'Upgrade to Premium'}
-                </h4>
+                <h4 className="font-bold text-lg">Patient Care Portal</h4>
                 <p className="text-xs text-slate-400 font-medium">
-                  {profile?.subscribed 
-                    ? 'You have full access to all AI features.' 
-                    : 'Unlock AI diagnosis & video calls.'}
+                  Direct clinical access to appointments, medical prescriptions, and private communication.
                 </p>
               </div>
               <Link 
-                to="/subscription" 
-                className={cn(
-                  "w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all",
-                  profile?.subscribed 
-                    ? "bg-white/10 text-white hover:bg-white/20" 
-                    : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-900/20"
-                )}
+                to="/appointments" 
+                className="w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-900/20"
               >
-                {profile?.subscribed ? 'Manage Plan' : 'View Plans'}
+                Schedule Consultation
                 <ArrowUpRight className="w-3 h-3" />
               </Link>
             </div>

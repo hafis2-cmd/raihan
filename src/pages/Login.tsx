@@ -181,8 +181,8 @@ export default function Login() {
           </div>
           
           <div className="space-y-2">
-            <h1 className="text-4xl font-black text-slate-800 tracking-tight">Raihan TeleMed</h1>
-            <p className="text-slate-500 font-medium">Digital Healthcare & Patient Care Platform</p>
+            <h1 className="text-4xl font-black text-slate-800 tracking-tight">Raihan</h1>
+            <p className="text-slate-500 font-medium">Telemedicine & Healthcare System</p>
           </div>
 
           <div className="w-full space-y-4">

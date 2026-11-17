@@ -75,7 +75,7 @@ export default function Payments() {
         <body>
           <div class="header">
             <div>
-              <div class="logo">🌿 Raihan TeleMed</div>
+              <div class="logo">🌿 Raihan Telemedicine</div>
               <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Payment Invoice & Official Receipt</div>
             </div>
             <div style="text-align: right;">
@@ -108,7 +108,7 @@ export default function Payments() {
               <tr>
                 <td>
                   <strong>${p.description || 'Clinical Teleconsultation Fee'}</strong><br/>
-                  <span style="font-size: 12px; color: #64748b;">Clinical medical service provided on Raihan TeleMed.</span>
+                  <span style="font-size: 12px; color: #64748b;">Clinical medical service provided on Raihan Telemedicine.</span>
                 </td>
                 <td style="text-align: right; font-weight: 700;">$${p.amount.toFixed(2)}</td>
               </tr>
@@ -120,8 +120,8 @@ export default function Payments() {
           </table>
 
           <div class="footer">
-            Thank you for choosing Raihan TeleMed.<br/>
-            For billing inquiries or insurance claim copies, contact support@raihantelemed.com
+            Thank you for choosing Raihan Telemedicine.<br/>
+            For billing inquiries or insurance claim copies, contact support@raihan.care
           </div>
           <script>
             window.onload = function() { window.print(); }

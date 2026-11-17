@@ -188,19 +188,19 @@ export default function Appointments() {
       const otherPersonName = isDoc ? app.patientName || app.patientEmail.split('@')[0] : app.doctorName;
       
       const summary = isDoc 
-        ? `Raihan TeleMed Appointment: ${otherPersonName}` 
-        : `Raihan TeleMed Consultation: Dr. ${otherPersonName}`;
+        ? `Raihan Appointment: ${otherPersonName}` 
+        : `Raihan Consultation: Dr. ${otherPersonName}`;
         
-      const description = `Your telehealth consultation session.\n\n` +
+      const description = `Your telemedicine consultation session.\n\n` +
         `Patient: ${app.patientName || app.patientEmail}\n` +
         `Physician: Dr. ${app.doctorName} (${app.doctorSpecialty || ''})\n` +
-        `Clinical Location: ${app.location || 'Raihan TeleMed Virtual Clinic'}\n\n` +
-        `💬 Raihan TeleMed Portal: ${window.location.origin}/messages\n\n` +
-        `* Please ensure you are logged strictly into your Raihan TeleMed dashboard.`;
+        `Clinical Location: ${app.location || 'Raihan Telemedicine Clinic'}\n\n` +
+        `💬 Raihan Portal: ${window.location.origin}/messages\n\n` +
+        `* Please ensure you are logged strictly into your Raihan dashboard.`;
 
       const eventPayload = {
         summary: summary,
-        location: app.location || 'TeleMed Clinic',
+        location: app.location || 'Raihan Clinic',
         description: description,
         start: {
           dateTime: startDateTime.toISOString(),
@@ -499,7 +499,7 @@ export default function Appointments() {
         doctor_name: doctorName,
         doctor_specialty: selectedDoctor.specialty || 'General Practitioner',
         doctor_image: selectedDoctor.image || null,
-        location: selectedDoctor.location || 'TeleMed Clinic',
+        location: selectedDoctor.location || 'Raihan Clinic',
         appointment_date: selectedDate,
         appointment_time: selectedTime,
         status: 'booked',
@@ -1078,7 +1078,7 @@ export default function Appointments() {
                       <p className="text-sm font-bold text-emerald-600">{doc.specialty || 'General Practitioner'}</p>
                       <div className="flex items-center gap-1.5 text-slate-400">
                         <MapPin className="w-3 h-3" />
-                        <span className="text-xs font-medium">{doc.location || 'TeleMed Clinic'}</span>
+                        <span className="text-xs font-medium">{doc.location || 'Raihan Clinic'}</span>
                       </div>
                     </div>
                   </div>

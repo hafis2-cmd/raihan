@@ -694,7 +694,7 @@ function PatientDetailModal({ patient, history, loading, onClose, navigate, onDe
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <History className="w-5 h-5 text-emerald-500" />
-                Medical History & AI Diagnoses
+                Medical History & Clinical Records
               </h3>
             </div>
 
@@ -747,7 +747,7 @@ function PatientDetailModal({ patient, history, loading, onClose, navigate, onDe
                     </div>
                     
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">AI Explanation</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Clinical Evaluation</p>
                       <p className="text-sm text-slate-600 leading-relaxed">{item.explanation}</p>
                     </div>
 

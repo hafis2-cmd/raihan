@@ -281,7 +281,7 @@ const handlePrintPrescription = (p: Prescription) => {
       <body>
         <div class="header">
           <div>
-            <div class="logo">🌿 Raihan TeleMed</div>
+            <div class="logo">🌿 Raihan Telemedicine</div>
             <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Digital Clinical Consultation & Care</div>
           </div>
           <div class="clinic-info">
@@ -339,7 +339,7 @@ const handlePrintPrescription = (p: Prescription) => {
         <div class="footer">
           <div class="stamp">
             ✔ Digitally Verified Prescription<br/>
-            <span style="font-size: 9px; font-weight: normal; color: #64748b;">Raihan TeleMed System Verified</span>
+            <span style="font-size: 9px; font-weight: normal; color: #64748b;">Raihan Telemedicine Verified</span>
           </div>
           <div class="signature">
             <div class="signature-line"></div>

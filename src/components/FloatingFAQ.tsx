@@ -48,7 +48,7 @@ const FAQ_DATABASE: FAQItem[] = [
   {
     category: 'prescriptions',
     question: "How do I print or download my digital prescription?",
-    answer: "Navigate to the Prescriptions tab, select any prescription record, and click 'Download PDF'. This generates an official Raihan TeleMed printable prescription complete with medication dosages, instructions, and physician verification stamps."
+    answer: "Navigate to the Prescriptions tab, select any prescription record, and click 'Download PDF'. This generates an official Raihan Telemedicine printable prescription complete with medication dosages, instructions, and physician verification stamps."
   },
   {
     category: 'prescriptions',
@@ -144,7 +144,7 @@ export default function FloatingFAQ() {
                       <HelpCircle className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Raihan TeleMed Help Center</h3>
+                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Raihan Telemedicine Help Center</h3>
                       <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Patient & Doctor Portal Guide</p>
                     </div>
                   </div>

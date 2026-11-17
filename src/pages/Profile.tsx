@@ -552,7 +552,7 @@ export default function Profile() {
                     </div>
                     <div className="text-left">
                       <h3 className="font-bold text-slate-800">Health Data Insights</h3>
-                      <p className="text-xs text-slate-500">AI-powered analysis of your profile factors</p>
+                      <p className="text-xs text-slate-500">Analysis of your profile factors and clinical metrics</p>
                     </div>
                   </div>
                   {showExplanation ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}

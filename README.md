@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Raihan - Telemedicine System
 
-# Run and deploy your AI Studio app
+A customized full-stack telemedicine platform designed for clinical patient care, appointments scheduling, electronic prescriptions, and direct physician-patient communication.
 
-This contains everything you need to run your app locally.
+## Key Features
 
-View your app in AI Studio: https://ai.studio/apps/15853dfa-1750-4549-a10b-6ce151ac84d1
+- **Dashboard**: Centralized clinical overview, upcoming appointments schedule, health stats, and clinical notifications.
+- **Appointments**: Interactive scheduling calendar, time slots booking, status management, and calendar synchronization.
+- **Prescriptions**: Digital prescription management with dosage tracking, clinical notes, and downloadable verified PDF prescriptions.
+- **Patients Directory**: Comprehensive medical history records, allergy tracking, and clinical communication tools for doctors.
+- **Messages**: Real-time secure 1-on-1 messaging between patients and healthcare providers with attachments.
+- **Payments & Billing**: Itemized consultation invoicing, payment processing, and downloadable PDF receipts.
+- **Call History**: Historical consultation logs, durations, and follow-up scheduling.
+- **Profile**: Medical vitals, emergency contacts, personal information, and preferences.
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+## Running Locally
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open in your browser:
+   `http://localhost:3000`

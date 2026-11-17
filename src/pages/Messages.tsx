@@ -39,7 +39,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import Markdown from 'react-markdown';
-import { getAiResponse, aiBotParticipant } from '../services/aiService';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,7 +51,6 @@ interface Message {
   text: string;
   timestamp: any;
   readBy?: Record<string, any>;
-  isAiGenerated?: boolean;
 }
 
 interface Conversation {
@@ -62,7 +60,6 @@ interface Conversation {
   lastMessage?: string;
   lastMessageTimestamp?: any;
   typing?: Record<string, any>;
-  isAiBot?: boolean;
   createdAt: any;
 }
 
@@ -83,7 +80,6 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [isAiTyping, setIsAiTyping] = useState(false);
   const [otherUserStatus, setOtherUserStatus] = useState<{ isOnline: boolean; lastSeen: any; typingTo: string | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout| null>(null);
@@ -108,7 +104,6 @@ export default function Messages() {
           lastMessage: d.lastMessage,
           lastMessageTimestamp: d.lastMessageTimestamp?.toDate ? d.lastMessageTimestamp.toDate().toISOString() : d.lastMessageTimestamp,
           typing: d.typing || {},
-          isAiBot: d.isAiBot || false,
           createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt
         } as Conversation);
       });
@@ -170,7 +165,7 @@ export default function Messages() {
 
   const handleStartNewChat = async (targetUser: any) => {
     const existing = conversations.find(c => 
-      c.participants.includes(targetUser.email) && !c.isAiBot
+      c.participants.includes(targetUser.email)
     );
 
     if (existing) {
@@ -200,51 +195,10 @@ export default function Messages() {
     setUserSearchQuery('');
   };
 
-  const startAiBotChat = async () => {
-    if (!profile?.email) return;
-    
-    const existing = conversations.find(c => c.isAiBot);
-    
-    if (existing) {
-      setSelectedChat(existing);
-    } else {
-      const convId = `ai_bot_${profile.email.replace(/\./g, '_')}`;
-      const welcomeMsg = "Hello! I'm your Health AI Bot. How can I help you today?";
-      const participantsData = {
-        [profile.email.replace(/\./g, '_')]: { name: profile.name || 'Me', role: profile.role || 'User' },
-        [aiBotParticipant.email.replace(/\./g, '_')]: { name: aiBotParticipant.name, role: aiBotParticipant.role }
-      };
-
-      try {
-        await setDoc(doc(db, 'conversations', convId), {
-          participants: [profile.email, aiBotParticipant.email],
-          participantsData,
-          isAiBot: true,
-          lastMessage: welcomeMsg,
-          lastMessageTimestamp: new Date(),
-          createdAt: new Date()
-        }, { merge: true });
-
-        await addDoc(collection(db, 'conversations', convId, 'messages'), {
-          text: welcomeMsg,
-          senderEmail: aiBotParticipant.email,
-          senderName: aiBotParticipant.name,
-          isAiGenerated: true,
-          timestamp: new Date()
-        });
-
-        setSelectedChat({ id: convId, participants: [profile.email, aiBotParticipant.email], participantsData, isAiBot: true, lastMessage: welcomeMsg, createdAt: new Date().toISOString() } as Conversation);
-      } catch (error) {
-        console.error('Error creating AI bot chat:', error);
-      }
-    }
-    setShowNewChatModal(false);
-  };
-
   // Handle "with" query param
   useEffect(() => {
     if (targetEmail && profile?.email && conversations.length >= 0) {
-      const existing = conversations.find(c => c.participants.includes(targetEmail) && !c.isAiBot);
+      const existing = conversations.find(c => c.participants.includes(targetEmail));
       if (existing) {
         setSelectedChat(existing);
       } else {
@@ -282,8 +236,7 @@ export default function Messages() {
           senderName: d.senderName,
           text: d.text,
           timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp,
-          readBy: d.readBy || {},
-          isAiGenerated: d.isAiGenerated || false
+          readBy: d.readBy || {}
         });
       });
       setMessages(list);
@@ -301,7 +254,7 @@ export default function Messages() {
 
   // Listen for other user's status
   useEffect(() => {
-    if (!selectedChat || selectedChat.isAiBot) {
+    if (!selectedChat) {
       setOtherUserStatus(null);
       return;
     }
@@ -384,40 +337,6 @@ export default function Messages() {
         lastMessage: textPayload,
         lastMessageTimestamp: new Date()
       });
-
-      // AI Bot Logic
-      if (selectedChat.isAiBot) {
-        setIsAiTyping(true);
-
-        const history = messages.slice(-10).map(m => ({
-          role: m.senderEmail === aiBotParticipant.email ? 'model' : 'user' as any,
-          content: m.text
-        }));
-        
-        const aiResponse = await getAiResponse(textPayload, history);
-        
-        // Add AI message
-        await addDoc(collection(db, 'conversations', selectedChat.id, 'messages'), {
-          text: aiResponse,
-          senderEmail: aiBotParticipant.email,
-          senderName: aiBotParticipant.name,
-          isAiGenerated: true,
-          timestamp: new Date(),
-          readBy: { 
-            [aiBotParticipant.email.replace(/\./g, '_')]: new Date().toISOString(), 
-            [profile.email.replace(/\./g, '_')]: new Date().toISOString() 
-          }
-        });
-
-        // Update conversation with AI response
-        await updateDoc(doc(db, 'conversations', selectedChat.id), {
-          lastMessage: aiResponse.slice(0, 50) + (aiResponse.length > 50 ? '...' : ''),
-          lastMessageTimestamp: new Date(),
-          typing: {}
-        });
-        
-        setIsAiTyping(false);
-      }
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -444,7 +363,7 @@ export default function Messages() {
 
         const userRef = doc(db, 'users', user.uid || user.id);
         const convRef = doc(db, 'conversations', selectedChat.id);
-        const targetEmailVal = selectedChat.isAiBot ? 'vitalis_ai' : targetEmail || selectedChat.participants.find(p => p !== profile.email);
+        const targetEmailVal = targetEmail || selectedChat.participants.find(p => p !== profile.email);
 
         await Promise.all([
           updateDoc(convRef, { typing: newTyping }),
@@ -530,16 +449,13 @@ export default function Messages() {
                       selectedChat?.id === conv.id && "bg-emerald-50/50 border-emerald-100"
                     )}
                   >
-                    <div className={cn(
-                      "w-12 h-12 rounded-2xl flex items-center justify-center font-bold shrink-0",
-                      conv.isAiBot ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"
-                    )}>
-                      {conv.isAiBot ? "AI" : (otherData?.name?.[0]?.toUpperCase() || "U")}
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold shrink-0 bg-slate-100 text-slate-500">
+                      {otherData?.name?.[0]?.toUpperCase() || "U"}
                     </div>
                     <div className="flex-1 text-left min-w-0">
                       <div className="flex justify-between items-start mb-0.5">
                         <h4 className="font-bold text-slate-800 truncate">
-                          {conv.isAiBot ? "Health AI Bot" : (otherData?.name || otherEmail)}
+                          {otherData?.name || otherEmail}
                         </h4>
                         {conv.lastMessageTimestamp && (
                           <span className="text-[10px] text-slate-400 font-bold uppercase">
@@ -590,39 +506,25 @@ export default function Messages() {
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center font-bold",
-                  selectedChat.isAiBot ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
-                )}>
-                  {selectedChat.isAiBot ? "AI" : (
-                    selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.name?.[0]?.toUpperCase()
-                  )}
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold bg-emerald-100 text-emerald-600">
+                  {selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.name?.[0]?.toUpperCase() || "U"}
                 </div>
                 <div>
                   <h3 className="font-black text-slate-800 tracking-tight">
-                    {selectedChat.isAiBot ? "Health AI Bot" : selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.name}
+                    {selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.name || "Care Member"}
                   </h3>
                   <div className="flex items-center gap-2">
-                    {selectedChat.isAiBot ? (
-                      <>
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bot Always Active</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          otherUserStatus?.isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
-                        )} />
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          {otherUserStatus?.isOnline ? 'Online' : (
-                            otherUserStatus?.lastSeen 
-                              ? `Last seen ${new Date(otherUserStatus.lastSeen.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                              : selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.role
-                          )}
-                        </span>
-                      </>
-                    )}
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      otherUserStatus?.isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
+                    )} />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {otherUserStatus?.isOnline ? 'Online' : (
+                        otherUserStatus?.lastSeen 
+                          ? `Last seen ${new Date(otherUserStatus.lastSeen.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : (selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.role || 'Member')
+                      )}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -671,29 +573,9 @@ export default function Messages() {
                       "max-w-[85%] p-4 rounded-2xl text-sm font-medium shadow-sm transition-all",
                       isMe 
                         ? "bg-emerald-600 text-white rounded-tr-none" 
-                        : "bg-white text-slate-700 border border-slate-100 rounded-tl-none",
-                      msg.isAiGenerated && "border-amber-100 bg-amber-50/30"
+                        : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
                     )}>
-                      {msg.isAiGenerated ? (
-                        <div className="markdown-body prose prose-sm prose-slate max-w-none">
-                          <Markdown
-                           components={{
-                             p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                             ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                             ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                             li: ({ children }) => <li className="mb-0.5">{children}</li>,
-                             strong: ({ children }) => <strong className="font-black text-amber-900">{children}</strong>,
-                             h1: ({ children }) => <h1 className="text-lg font-black mb-2">{children}</h1>,
-                             h2: ({ children }) => <h2 className="text-base font-black mb-1.5">{children}</h2>,
-                             h3: ({ children }) => <h3 className="text-sm font-black mb-1">{children}</h3>,
-                           }}
-                          >
-                            {msg.text}
-                          </Markdown>
-                        </div>
-                      ) : (
-                        msg.text
-                      )}
+                      {msg.text}
                     </div>
                     <div className={cn(
                       "flex items-center gap-1.5 mt-1 px-1",
@@ -716,7 +598,7 @@ export default function Messages() {
               
               {(() => {
                 const otherEmail = selectedChat.participants.find(e => e !== profile?.email);
-                const isTyping = (otherEmail && selectedChat.typing && selectedChat.typing[otherEmail.replace(/\./g, '_')]) || (selectedChat.isAiBot && isAiTyping);
+                const isTyping = Boolean(otherEmail && selectedChat.typing && selectedChat.typing[otherEmail.replace(/\./g, '_')]);
                 
                 if (isTyping) {
                   return (
@@ -726,7 +608,7 @@ export default function Messages() {
                         <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
                         <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" />
                         <span className="text-[10px] font-black ml-1 uppercase tracking-widest text-emerald-500">
-                          {selectedChat.isAiBot ? "Vitalis is thinking..." : "Typing..."}
+                          Typing...
                         </span>
                       </div>
                     </div>
@@ -811,21 +693,6 @@ export default function Messages() {
                 </div>
 
                 <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
-                  <button
-                    onClick={startAiBotChat}
-                    className="w-full flex items-center gap-3 p-3 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all text-left group border border-amber-100"
-                  >
-                    <div className="w-10 h-10 bg-amber-200 rounded-xl flex items-center justify-center text-amber-700 font-black text-sm">
-                      AI
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-amber-900">Health AI Bot</p>
-                      <p className="text-[10px] text-amber-700 font-medium italic">Instant answers for your health queries</p>
-                    </div>
-                  </button>
-
-                  <div className="h-px bg-slate-100 my-2" />
-
                   {searchingUsers ? (
                     <div className="py-8 text-center">
                       <Loader2 className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
