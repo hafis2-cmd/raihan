@@ -417,7 +417,7 @@ export default function Patients() {
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black text-xl border-2 border-white shadow-sm">
-                        {patient.name[0].toUpperCase()}
+                        {(patient.name || 'P').charAt(0).toUpperCase()}
                       </div>
                       {patient.isOnline && (
                         <div className="absolute top-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm animate-pulse z-10" />
@@ -657,7 +657,7 @@ function PatientDetailModal({ patient, history, loading, onClose, navigate, onDe
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-slate-200 font-black text-2xl">
-                {patient.name[0].toUpperCase()}
+                {(patient.name || 'P').charAt(0).toUpperCase()}
               </div>
               {patient.isOnline && (
                 <div className="absolute top-0 right-0 w-5 h-5 bg-emerald-500 rounded-full border-4 border-white shadow-sm animate-pulse z-10" />

@@ -26,7 +26,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { db, auth } from '../firebase';
+import { db, auth, isFirebaseConfigured } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { getProfileExplanation, ProfileExplanation } from '../services/explanationService';
@@ -92,13 +92,25 @@ export default function Profile() {
     // Update local state immediately for responsiveness
     setFormData(prev => ({ ...prev, newsletter: newValue }));
     
-    try {
-      const userRef = doc(db, 'users', user.uid || user.id);
-      await updateDoc(userRef, { newsletter: newValue });
-    } catch (error) {
-      console.error('Error updating newsletter status:', error);
-      // Revert local state if DB update fails
-      setFormData(prev => ({ ...prev, newsletter: !newValue }));
+    if (isFirebaseConfigured && auth.currentUser) {
+      try {
+        const userRef = doc(db, 'users', user.uid || user.id);
+        await updateDoc(userRef, { newsletter: newValue });
+      } catch (error) {
+        console.error('Error updating newsletter status:', error);
+        setFormData(prev => ({ ...prev, newsletter: !newValue }));
+      }
+    } else {
+      const savedProfile = localStorage.getItem('raihan_active_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          parsed.newsletter = newValue;
+          localStorage.setItem('raihan_active_profile', JSON.stringify(parsed));
+        } catch (e) {
+          // ignore
+        }
+      }
     }
   };
 
@@ -130,8 +142,17 @@ export default function Profile() {
         updateData.role = formData.role;
       }
 
-      const userRef = doc(db, 'users', user.uid || user.id);
-      await updateDoc(userRef, updateData);
+      if (isFirebaseConfigured && auth.currentUser) {
+        const userRef = doc(db, 'users', user.uid || user.id);
+        await updateDoc(userRef, updateData);
+      } else {
+        const updated = {
+          ...profile,
+          ...updateData,
+          role: updateData.role || profile?.role || 'Patient',
+        };
+        localStorage.setItem('raihan_active_profile', JSON.stringify(updated));
+      }
 
       setSaveSuccess(true);
       setIsEditing(false);
@@ -199,9 +220,9 @@ export default function Profile() {
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4">
             <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-black text-3xl border-4 border-white shadow-inner overflow-hidden">
               {formData.image ? (
-                <img src={formData.image} alt={formData.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={formData.image} alt={formData.name || 'User'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                profile?.email?.[0].toUpperCase()
+                (formData.name || profile?.name || profile?.email || 'U').charAt(0).toUpperCase()
               )}
             </div>
             <div>

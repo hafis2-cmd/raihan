@@ -705,7 +705,7 @@ export default function Messages() {
                         className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl transition-all text-left group"
                       >
                         <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black text-sm group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-all">
-                          {user.name?.[0].toUpperCase() || user.email[0].toUpperCase()}
+                          {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-800">{user.name || user.email.split('@')[0]}</p>

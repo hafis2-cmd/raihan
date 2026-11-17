@@ -56,17 +56,24 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-slate-500 font-medium mb-8">
               {errorDetails 
                 ? `A database error occurred while performing a ${errorDetails.operationType} operation.`
-                : "An unexpected error occurred. Our team has been notified."}
+                : (this.state.error?.message || "An unexpected error occurred. Our team has been notified.")}
             </p>
 
-            {errorDetails && (
+            {errorDetails ? (
               <div className="bg-slate-50 rounded-2xl p-4 mb-8 text-left overflow-hidden">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Error Details</p>
                 <div className="font-mono text-[11px] text-slate-600 break-all whitespace-pre-wrap">
                   {JSON.stringify(errorDetails, null, 2)}
                 </div>
               </div>
-            )}
+            ) : this.state.error?.message ? (
+              <div className="bg-slate-50 rounded-2xl p-4 mb-8 text-left overflow-hidden">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Diagnostic Info</p>
+                <div className="font-mono text-[11px] text-slate-600 break-all whitespace-pre-wrap">
+                  {this.state.error.message}
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-4">
               <button

@@ -240,7 +240,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             
             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-850 border-2 border-white dark:border-slate-850 shadow-xs overflow-hidden flex items-center justify-center text-slate-500 dark:text-slate-400 font-extrabold text-sm shrink-0">
-              {profile?.email?.[0].toUpperCase() || 'U'}
+              {(profile?.name || profile?.email || 'U').charAt(0).toUpperCase()}
             </div>
           </div>
         </header>

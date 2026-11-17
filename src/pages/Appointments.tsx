@@ -1065,7 +1065,7 @@ export default function Appointments() {
                         {doc.image ? (
                           <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          doc.name?.[0].toUpperCase()
+                          (doc.name || 'D').charAt(0).toUpperCase()
                         )}
                       </div>
                       <div className="absolute -bottom-2 -right-2 bg-white px-2 py-1 rounded-lg shadow-sm border border-slate-100 flex items-center gap-1">
