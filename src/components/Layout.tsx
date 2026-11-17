@@ -142,12 +142,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             : "-translate-x-full md:translate-x-0 md:w-20"
         )}
       >
-        <div className="p-6 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/60">
+        <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-emerald-600 dark:bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-100 dark:shadow-none">
-              <Activity className="w-5 h-5 animate-pulse" />
+            <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-xs">
+              <Stethoscope className="w-5 h-5 text-white" />
             </div>
-            {isSidebarOpen && <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-slate-100">Raihan Dental Clinic</span>}
+            {isSidebarOpen && (
+              <div>
+                <span className="font-bold text-base tracking-tight text-slate-900 dark:text-slate-100 block leading-tight">
+                  Raihan Dental
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">
+                  Clinic Management
+                </span>
+              </div>
+            )}
           </div>
           {/* Close button inside sidebar on mobile only */}
           {isSidebarOpen && (
@@ -251,7 +260,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center animate-pulse shadow-xs">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -259,13 +268,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
               {/* Notification Popover Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-fadeIn">
+                <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl z-50 overflow-hidden animate-fadeIn">
                   <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
                     <div className="flex items-center gap-2">
                       <Bell className="w-4 h-4 text-emerald-600" />
-                      <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">Notifications</h4>
+                      <h4 className="font-semibold text-sm text-slate-800 dark:text-slate-100">Notifications</h4>
                       {unreadCount > 0 && (
-                        <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                        <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-semibold rounded-full">
                           {unreadCount} new
                         </span>
                       )}
@@ -273,7 +282,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
-                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
+                        className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
                       >
                         Mark all read
                       </button>
@@ -349,26 +358,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* User Account Info */}
             <div className="text-right hidden sm:block">
               <div className="flex items-center gap-2 justify-end">
-                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
-                  {profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'Dentist' : 'Patient')}
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'Dr. Raihan' : 'Patient')}
                 </p>
-                {profile?.subscribed && profile?.role !== 'Admin' && (
-                  <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[8px] font-black rounded uppercase tracking-tighter">
-                    PRO
-                  </span>
-                )}
                 {profile?.role === 'Admin' && (
-                  <span className="px-1.5 py-0.5 bg-indigo-600 text-white text-[8px] font-black rounded uppercase tracking-tighter">
-                    ADMIN
+                  <span className="px-2 py-0.5 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-semibold rounded-md tracking-wide">
+                    Admin
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                {profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'Dentist' : (profile?.role || 'Patient')}
+                {profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'Dental Surgeon' : 'Patient'}
               </p>
             </div>
             
-            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-850 border-2 border-white dark:border-slate-850 shadow-xs overflow-hidden flex items-center justify-center text-slate-500 dark:text-slate-400 font-extrabold text-sm shrink-0">
+            <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 shadow-xs overflow-hidden flex items-center justify-center text-emerald-800 dark:text-emerald-300 font-bold text-sm shrink-0">
               {(profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'D' : 'P')).charAt(0).toUpperCase()}
             </div>
           </div>

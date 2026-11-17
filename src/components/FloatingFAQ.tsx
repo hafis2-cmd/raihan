@@ -116,59 +116,57 @@ export default function FloatingFAQ() {
     <>
       {/* Floating Action Help Trigger */}
       <div className="fixed bottom-6 right-6 z-40">
-        <motion.button
+        <button
           onClick={() => setIsOpen(true)}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-2 bg-slate-900 dark:bg-emerald-600 text-white font-extrabold text-xs tracking-wider uppercase pl-3.5 pr-4.5 py-3 rounded-full shadow-2xl hover:bg-slate-800 dark:hover:bg-emerald-700 transition-all border border-slate-800 dark:border-emerald-500/30 group cursor-pointer"
+          className="flex items-center gap-2 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium text-xs tracking-wide px-4 py-2.5 rounded-full shadow-lg border border-slate-700/60 dark:border-slate-700 transition-all cursor-pointer"
           id="floating-help-faq-btn"
         >
-          <HelpCircle className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform duration-300" />
-          <span>Help Center</span>
-        </motion.button>
+          <HelpCircle className="w-4 h-4 text-emerald-400" />
+          <span>Clinic Guide</span>
+        </button>
       </div>
 
       {/* FAQ Modal Panel Overlays */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-4">
             {/* Backdrop click closer */}
             <div className="absolute inset-0" onClick={() => setIsOpen(false)} />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 30 }}
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh]"
+              exit={{ opacity: 0, scale: 0.96, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh]"
             >
               {/* Top Custom Header */}
-              <div className="p-6 pb-4 border-b border-slate-150 dark:border-slate-800 shrink-0 space-y-3">
+              <div className="p-5 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0 space-y-3">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center justify-center">
-                      <HelpCircle className="w-4.5 h-4.5" />
+                      <HelpCircle className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Raihan Dental Clinic Help Center</h3>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Patient & Dentist Clinic Guide</p>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100 tracking-tight text-base">Raihan Dental Clinic Guide</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Patient & Practice Frequently Asked Questions</p>
                     </div>
                   </div>
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
-                    <X className="w-4.5 h-4.5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Sub-disclaimer info banner */}
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 p-3 rounded-2xl flex items-start gap-2 text-[10px] text-emerald-850 dark:text-emerald-400 font-semibold leading-relaxed">
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 p-3 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>All your dental consultations, prescriptions, and private clinical records are securely retained.</span>
+                  <span>Clinical consultation records, dental prescriptions, and invoices are kept strictly confidential.</span>
                 </div>
 
                 {/* Categories filtering tabs */}
-                <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl overflow-x-auto">
+                <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto">
                   {(['all', 'appointments', 'prescriptions', 'messages', 'billing'] as const).map((cat) => (
                     <button
                       key={cat}
@@ -177,10 +175,10 @@ export default function FloatingFAQ() {
                         setActiveTab(cat);
                         setExpandedIndex(null);
                       }}
-                      className={`flex-1 text-[9px] font-black uppercase tracking-wider py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center shrink-0 ${
+                      className={`flex-1 text-[11px] font-medium capitalize py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center shrink-0 ${
                         activeTab === cat 
-                          ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
-                          : "text-slate-400 hover:text-slate-650"
+                          ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs font-semibold"
+                          : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
                       {cat}
@@ -195,8 +193,8 @@ export default function FloatingFAQ() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search appointments, prescriptions, billing..."
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-205 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                    placeholder="Search dental topics, appointments, billing..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all"
                   />
                 </div>
               </div>
@@ -269,28 +267,25 @@ export default function FloatingFAQ() {
                     );
                   })
                 ) : (
-                  <div className="text-center py-12 px-4 space-y-3">
-                    <Info className="w-8 h-8 text-slate-300 mx-auto" />
-                    <p className="text-slate-400 font-bold text-xs">No matching healthcare topics found.</p>
-                    <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">Try querying simpler keywords like 'accuracy', 'WebRTC', 'HIPAA', or 'share'.</p>
+                  <div className="text-center py-12 px-4 space-y-2">
+                    <Info className="w-8 h-8 text-slate-350 dark:text-slate-600 mx-auto" />
+                    <p className="text-slate-600 dark:text-slate-400 font-semibold text-xs">No matching topics found.</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 font-normal">Try searching for keywords like 'appointment', 'prescription', or 'invoice'.</p>
                   </div>
                 )}
               </div>
 
-              {/* Bottom HIPAA compliance lock */}
-              <div className="p-5.5 bg-slate-900 text-white shrink-0 sm:rounded-b-[2.5rem] flex items-center justify-between gap-2 border-t border-slate-800">
+              {/* Clinic Footer */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 text-slate-650 dark:text-slate-300 shrink-0 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4.5 h-4.5 text-emerald-400 animate-pulse shrink-0" />
-                  <div className="translate-y-0.5">
-                    <span className="block text-[8px] font-black tracking-widest uppercase text-emerald-400">HIPAA Secure Portal</span>
-                    <span className="block text-[9px] text-slate-450 font-bold leading-none">All health assets are fully encrypted.</span>
-                  </div>
+                  <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-slate-600 dark:text-slate-350">Clinic Hours: Mon – Sat, 9:00 AM – 5:00 PM</span>
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer"
                 >
-                  Got It
+                  Close
                 </button>
               </div>
             </motion.div>

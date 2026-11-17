@@ -535,35 +535,33 @@ export default function Appointments() {
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
       
       {/* ---------------- PAGE TOP BAR ---------------- */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className={cn(
-              "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
-              isDoctor ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
-            )}>
-              {isDoctor ? 'Dentist Schedule Controller' : 'Patient Dental Booking Portal'}
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+              {isDoctor ? 'Clinical Schedule' : 'Dental Appointments'}
             </span>
-            <span className="text-xs text-slate-400 font-semibold">• Dentist Approval Workflow</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
-            {isDoctor ? 'Dental Appointment Requests & Schedule' : 'Schedule a Dental Visit'}
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+            Appointments
           </h1>
-          <p className="text-slate-500 font-medium text-sm md:text-base">
+          <p className="text-slate-500 dark:text-slate-400 font-normal text-sm">
             {isDoctor 
-              ? 'Review pending patient dental requests, approve time slots, and manage clinic availability.'
-              : 'Select a dentist, choose an open clinical slot, and submit an appointment request for dentist approval.'}
+              ? 'Review pending patient consultation requests, approve time slots, and manage clinic availability.'
+              : 'Request an on-site dental consultation and monitor your appointment status.'}
           </p>
         </div>
 
         {/* View Toggles (List vs Calendar) */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
             <button
               onClick={() => setViewMode('list')}
               className={cn(
-                "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                viewMode === 'list' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+                "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer",
+                viewMode === 'list' 
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs" 
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               )}
             >
               <LayoutList className="w-3.5 h-3.5" />
@@ -572,8 +570,10 @@ export default function Appointments() {
             <button
               onClick={() => setViewMode('calendar')}
               className={cn(
-                "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                viewMode === 'calendar' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+                "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer",
+                viewMode === 'calendar' 
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs" 
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               )}
             >
               <CalendarDays className="w-3.5 h-3.5" />
@@ -616,20 +616,20 @@ export default function Appointments() {
         <div className="space-y-6">
           
           {/* Doctor Navigation Tabs */}
-          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
             <button
               onClick={() => setDoctorActiveTab('requests')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 doctorActiveTab === 'requests' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
-              <Clock className="w-4 h-4 text-amber-400" />
+              <Clock className="w-4 h-4 text-amber-500" />
               <span>Pending Requests</span>
               {doctorPendingRequests.length > 0 && (
-                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full">
+                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
                   {doctorPendingRequests.length}
                 </span>
               )}
@@ -638,16 +638,16 @@ export default function Appointments() {
             <button
               onClick={() => setDoctorActiveTab('upcoming')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 doctorActiveTab === 'upcoming' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               <span>Confirmed Visits</span>
               {doctorUpcomingAccepted.length > 0 && (
-                <span className="px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-full">
+                <span className="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
                   {doctorUpcomingAccepted.length}
                 </span>
               )}
@@ -656,24 +656,24 @@ export default function Appointments() {
             <button
               onClick={() => setDoctorActiveTab('availability')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 doctorActiveTab === 'availability' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <Stethoscope className="w-4 h-4 text-emerald-600" />
-              <span>Manage Availability Slots</span>
-              <span className="text-[10px] text-slate-400 font-semibold">({currentDoctorSlots.length})</span>
+              <span>Manage Availability</span>
+              <span className="text-[11px] text-slate-400">({currentDoctorSlots.length})</span>
             </button>
 
             <button
               onClick={() => setDoctorActiveTab('history')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 doctorActiveTab === 'history' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <CalendarIcon className="w-4 h-4 text-slate-400" />
@@ -686,22 +686,22 @@ export default function Appointments() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Pending Patient Requests</h3>
-                  <p className="text-xs text-slate-500 font-medium">Review patient symptoms, requested slot, and decide to Approve or Decline.</p>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Pending Consultation Requests</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Review patient symptoms, requested slot, and accept or decline.</p>
                 </div>
-                <span className="text-xs font-bold text-slate-500">
-                  {doctorPendingRequests.length} request(s) awaiting your decision
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {doctorPendingRequests.length} awaiting decision
                 </span>
               </div>
 
               {doctorPendingRequests.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto">
-                    <CheckCheck className="w-8 h-8 text-emerald-500" />
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 mx-auto">
+                    <CheckCheck className="w-6 h-6 text-emerald-500" />
                   </div>
-                  <h4 className="font-bold text-slate-800 text-base">All Caught Up!</h4>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    You have no pending appointment requests at this moment. New requests submitted by patients will appear here immediately.
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">No Pending Requests</h4>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    You have no pending appointment requests. New requests submitted by registered patients will appear here immediately.
                   </p>
                 </div>
               ) : (
@@ -709,81 +709,79 @@ export default function Appointments() {
                   {doctorPendingRequests.map((appt) => (
                     <motion.div
                       key={appt.id}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-white p-6 sm:p-7 rounded-[2.5rem] border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-5"
+                      className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors space-y-4"
                     >
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-black text-xl border border-amber-200 shrink-0">
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-base border border-amber-200 dark:border-amber-800/60 shrink-0">
                             {(appt.patient_name || 'P').charAt(0).toUpperCase()}
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-0.5">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-lg font-black text-slate-800">{appt.patient_name}</h4>
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
-                                ⏳ Pending Approval
+                              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{appt.patient_name}</h4>
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                                Pending Approval
                               </span>
                             </div>
-                            <p className="text-xs text-slate-500 font-medium">{appt.patient_email}</p>
-                            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-600 font-medium">
-                              {appt.patient_age && <span>Age: <strong>{appt.patient_age} yrs</strong></span>}
-                              {appt.patient_gender && <span>Gender: <strong>{appt.patient_gender}</strong></span>}
-                              {appt.patient_blood_group && <span>Blood Group: <strong>{appt.patient_blood_group}</strong></span>}
-                              {appt.patient_phone && <span>Phone: <strong>{appt.patient_phone}</strong></span>}
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{appt.patient_email}</p>
+                            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-600 dark:text-slate-400">
+                              {appt.patient_phone && <span>Phone: <strong className="text-slate-800 dark:text-slate-200">{appt.patient_phone}</strong></span>}
+                              {appt.patient_blood_group && <span>Blood: <strong className="text-slate-800 dark:text-slate-200">{appt.patient_blood_group}</strong></span>}
                             </div>
                           </div>
                         </div>
 
                         {/* Request Date & Time Box */}
-                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-right space-y-1 shrink-0">
-                          <div className="flex items-center md:justify-end gap-1.5 text-xs font-bold text-slate-800">
+                        <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-left md:text-right space-y-0.5 shrink-0">
+                          <div className="flex items-center md:justify-end gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
                             <CalendarIcon className="w-3.5 h-3.5 text-emerald-600" />
                             <span>{appt.appointment_date}</span>
                           </div>
-                          <div className="flex items-center md:justify-end gap-1.5 text-xs font-bold text-slate-600">
-                            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                          <div className="flex items-center md:justify-end gap-1.5 text-xs text-slate-600 dark:text-slate-400 font-medium">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
                             <span>{appt.appointment_time} ({appt.duration || 30} mins)</span>
                           </div>
-                          <span className="inline-block mt-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            🏥 On-Site Consultation
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                            On-Site Consultation
                           </span>
                         </div>
                       </div>
 
                       {/* Reason for Consultation */}
-                      <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                          Patient Reason for Consultation
+                      <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/80 space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                          Patient Complaint / Concern
                         </span>
-                        <p className="text-xs text-slate-700 leading-relaxed font-semibold italic">
-                          "{appt.reason}"
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                          {appt.reason}
                         </p>
                       </div>
 
                       {/* Doctor Decision Action Buttons */}
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          Submitted: {new Date(appt.created_at || Date.now()).toLocaleString()}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <span className="text-[11px] text-slate-400">
+                          Requested: {new Date(appt.created_at || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleOpenRejectModal(appt)}
                             disabled={isSubmittingDecision}
-                            className="px-5 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="px-3.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
-                            <XCircle className="w-4 h-4" />
-                            <span>Decline Request</span>
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Decline</span>
                           </button>
 
                           <button
                             onClick={() => handleDoctorAccept(appt.id)}
                             disabled={isSubmittingDecision}
-                            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-md shadow-emerald-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                           >
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Approve & Reserve Slot</span>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Accept Appointment</span>
                           </button>
                         </div>
                       </div>
@@ -799,79 +797,82 @@ export default function Appointments() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Confirmed Patient Consultations</h3>
-                  <p className="text-xs text-slate-500 font-medium">Appointments you have approved and locked in your schedule.</p>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Confirmed Patient Consultations</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Appointments you have accepted and locked into your clinic schedule.</p>
                 </div>
-                <span className="text-xs font-bold text-slate-500">{doctorUpcomingAccepted.length} confirmed</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{doctorUpcomingAccepted.length} confirmed</span>
               </div>
 
               {doctorUpcomingAccepted.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto">
-                    <CalendarIcon className="w-8 h-8" />
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 mx-auto">
+                    <CalendarIcon className="w-6 h-6 text-emerald-500" />
                   </div>
-                  <h4 className="font-bold text-slate-800 text-base">No Confirmed Visits Yet</h4>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    When you accept incoming requests, they will appear here with Google Calendar sync, prescription tools, and patient consultation records.
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">No Confirmed Visits Yet</h4>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+                    When you accept incoming requests, they will appear here with calendar sync, prescription writing, and consultation completion actions.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {doctorUpcomingAccepted.map((appt) => (
-                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+                    <div key={appt.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-lg border border-emerald-100">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60">
                             {(appt.patient_name || 'P').charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <h4 className="font-bold text-slate-800 text-sm">{appt.patient_name}</h4>
-                            <p className="text-[11px] text-slate-400">{appt.patient_email}</p>
+                            <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{appt.patient_name}</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{appt.patient_email}</p>
                           </div>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                           Confirmed
                         </span>
                       </div>
 
-                      <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-1 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Date & Time</span>
-                          <span className="font-bold text-slate-700">{appt.appointment_date} at {appt.appointment_time}</span>
+                          <span className="text-slate-500 dark:text-slate-400">Date & Time</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{appt.appointment_date} at {appt.appointment_time}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Visit Location</span>
-                          <span className="font-bold text-slate-700">🏥 Raihan Dental Clinic (On-Site)</span>
+                          <span className="text-slate-500 dark:text-slate-400">Visit Location</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">Raihan Dental Clinic (On-Site)</span>
                         </div>
-                        <div className="pt-1 text-[11px] text-slate-600 italic">
-                          "{appt.reason}"
-                        </div>
+                        {appt.reason && (
+                          <div className="pt-1 text-xs text-slate-600 dark:text-slate-300 italic">
+                            "{appt.reason}"
+                          </div>
+                        )}
                       </div>
 
                       {/* Doctor Action Buttons */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleSyncToGoogleCalendar(appt)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors"
                           >
-                            <CalendarPlus className="w-3 h-3 text-emerald-600" />
-                            <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Cal'}</span>
+                            <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Calendar'}</span>
                           </button>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => navigate('/prescriptions', { state: { patientEmail: appt.patient_email, patientName: appt.patient_name } })}
-                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"
+                            className="px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
                             title="Write Prescription"
                           >
-                            <FileText className="w-4 h-4" />
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Prescription</span>
                           </button>
 
                           <button
                             onClick={() => handleDoctorComplete(appt.id)}
-                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold"
+                            className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-medium transition-colors"
                           >
                             Complete
                           </button>
@@ -890,41 +891,43 @@ export default function Appointments() {
               
               {/* Left Column: Slot Generator Form */}
               <div className="lg:col-span-1 space-y-6">
-                <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-[2.5rem] text-white shadow-xl shadow-emerald-100 space-y-5">
-                  <div className="flex items-center gap-3 border-b border-white/15 pb-3">
-                    <Stethoscope className="w-6 h-6 text-white" />
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
+                  <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                      <Stethoscope className="w-4 h-4" />
+                    </div>
                     <div>
-                      <h3 className="font-black text-base">Dentist Availability Manager</h3>
-                      <p className="text-[10px] text-emerald-100 font-semibold">Define your clinic appointment schedule</p>
+                      <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Schedule Availability</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Configure clinic hours and appointment slots</p>
                     </div>
                   </div>
 
                   {availError && (
-                    <div className="p-3 bg-rose-500/20 border border-rose-300 text-white rounded-xl text-xs font-bold">
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-medium">
                       {availError}
                     </div>
                   )}
 
                   {availSuccess && (
-                    <div className="p-3 bg-white/20 border border-white/30 text-white rounded-xl text-xs font-bold">
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-medium">
                       {availSuccess}
                     </div>
                   )}
 
                   <div className="space-y-4 text-xs">
                     <div className="space-y-1.5">
-                      <label className="font-bold uppercase tracking-wider text-emerald-100">Select Date</label>
+                      <label className="font-medium text-slate-700 dark:text-slate-300">Select Date</label>
                       <input
                         type="date"
                         min={new Date().toISOString().split('T')[0]}
                         value={availDate}
                         onChange={(e) => setAvailDate(e.target.value)}
-                        className="w-full bg-white/15 border border-white/30 rounded-xl p-3 text-white font-bold outline-none focus:bg-white/25"
+                        className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-slate-100 text-xs font-medium outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="font-bold uppercase tracking-wider text-emerald-100">Session Duration</label>
+                      <label className="font-medium text-slate-700 dark:text-slate-300">Slot Duration</label>
                       <div className="grid grid-cols-4 gap-2">
                         {[15, 30, 45, 60].map(dur => (
                           <button
@@ -932,8 +935,10 @@ export default function Appointments() {
                             type="button"
                             onClick={() => setAvailDuration(dur)}
                             className={cn(
-                              "py-2 rounded-xl font-bold text-xs transition-all cursor-pointer",
-                              availDuration === dur ? "bg-white text-emerald-700 shadow-sm" : "bg-white/10 hover:bg-white/20 text-white"
+                              "py-2 rounded-xl text-xs font-medium transition-all cursor-pointer border",
+                              availDuration === dur 
+                                ? "bg-slate-900 text-white dark:bg-emerald-600 dark:text-white border-transparent shadow-xs" 
+                                : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
                             )}
                           >
                             {dur}m
@@ -943,56 +948,56 @@ export default function Appointments() {
                     </div>
 
                     <div className="space-y-1.5 pt-1">
-                      <label className="font-bold uppercase tracking-wider text-emerald-100">Add Custom Slot Time</label>
+                      <label className="font-medium text-slate-700 dark:text-slate-300">Add Individual Slot</label>
                       <div className="flex gap-2">
                         <input
                           type="time"
                           value={availTime}
                           onChange={(e) => setAvailTime(e.target.value)}
-                          className="flex-1 bg-white/15 border border-white/30 rounded-xl p-3 text-white font-bold outline-none"
+                          className="flex-1 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-slate-100 text-xs font-medium outline-none focus:ring-1 focus:ring-emerald-500"
                         />
                         <button
                           type="button"
                           onClick={handleAddSingleSlot}
-                          className="px-4 py-3 bg-white text-emerald-700 hover:bg-emerald-50 rounded-xl font-black text-xs shadow-sm flex items-center gap-1 cursor-pointer"
+                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-xl font-medium text-xs shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3.5 h-3.5" />
                           <span>Add</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Quick Batch Slot Generation */}
-                    <div className="pt-3 border-t border-white/15 space-y-2">
-                      <label className="font-bold uppercase tracking-wider text-emerald-100 block">
-                        Quick Batch Slot Generator
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                      <label className="font-medium text-slate-700 dark:text-slate-300 block">
+                        Quick Slot Blocks
                       </label>
                       <div className="grid grid-cols-1 gap-2">
                         <button
                           type="button"
                           onClick={() => handleBatchGenerateSlots('morning')}
-                          className="w-full p-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-left text-xs transition-all flex items-center justify-between cursor-pointer"
+                          className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-left text-xs transition-colors flex items-center justify-between cursor-pointer"
                         >
-                          <span>🌅 Morning Block (9:00 AM - 12:00 PM)</span>
-                          <span className="text-[10px] opacity-80">+6 slots</span>
+                          <span>Morning Block (9:00 AM – 12:00 PM)</span>
+                          <span className="text-[11px] text-slate-400 font-normal">+6 slots</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleBatchGenerateSlots('afternoon')}
-                          className="w-full p-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-left text-xs transition-all flex items-center justify-between cursor-pointer"
+                          className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-left text-xs transition-colors flex items-center justify-between cursor-pointer"
                         >
-                          <span>☀️ Afternoon Block (2:00 PM - 5:00 PM)</span>
-                          <span className="text-[10px] opacity-80">+6 slots</span>
+                          <span>Afternoon Block (2:00 PM – 5:00 PM)</span>
+                          <span className="text-[11px] text-slate-400 font-normal">+6 slots</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleBatchGenerateSlots('evening')}
-                          className="w-full p-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-left text-xs transition-all flex items-center justify-between cursor-pointer"
+                          className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-left text-xs transition-colors flex items-center justify-between cursor-pointer"
                         >
-                          <span>🌙 Evening Block (5:00 PM - 7:00 PM)</span>
-                          <span className="text-[10px] opacity-80">+4 slots</span>
+                          <span>Evening Block (5:00 PM – 7:00 PM)</span>
+                          <span className="text-[11px] text-slate-400 font-normal">+4 slots</span>
                         </button>
                       </div>
                     </div>
@@ -1002,22 +1007,22 @@ export default function Appointments() {
 
               {/* Right Column: Active Slots for Selected Date */}
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                     <div>
-                      <h4 className="font-black text-slate-800 text-lg">Defined Slots for {availDate}</h4>
-                      <p className="text-xs text-slate-400 font-medium">Patients will choose from these slots when requesting appointments.</p>
+                      <h4 className="font-semibold text-slate-950 dark:text-slate-100 text-base">Defined Slots for {availDate}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Patients will choose from these slots when requesting on-site consultations.</p>
                     </div>
-                    <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+                    <span className="text-xs font-medium px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-100 dark:border-emerald-800/60 self-start sm:self-auto">
                       {slotsForSelectedAvailDate.length} slot(s)
                     </span>
                   </div>
 
                   {slotsForSelectedAvailDate.length === 0 ? (
-                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
-                      <Clock className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="text-xs font-bold text-slate-600">No availability slots defined for {availDate}.</p>
-                      <p className="text-[11px] text-slate-400">Use the left panel to generate morning or afternoon slot blocks.</p>
+                    <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 space-y-2">
+                      <Clock className="w-8 h-8 text-slate-350 dark:text-slate-600 mx-auto" />
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No availability slots defined for {availDate}.</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Use the left panel to configure morning, afternoon, or individual slot blocks.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -1025,27 +1030,27 @@ export default function Appointments() {
                         <div
                           key={slot.id}
                           className={cn(
-                            "p-3.5 rounded-2xl border flex items-center justify-between transition-all",
+                            "p-3 rounded-xl border flex items-center justify-between transition-colors",
                             slot.is_available 
-                              ? "bg-slate-50 border-slate-200 text-slate-800" 
-                              : "bg-amber-50/70 border-amber-200 text-amber-900"
+                              ? "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200" 
+                              : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200"
                           )}
                         >
                           <div>
-                            <p className="text-xs font-black">{slot.slot_time}</p>
-                            <span className="text-[10px] font-bold text-slate-400">{slot.duration || 30}m</span>
+                            <p className="text-xs font-semibold">{slot.slot_time}</p>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">{slot.duration || 30} mins</span>
                             <span className={cn(
-                              "block text-[9px] font-black uppercase tracking-wider mt-0.5",
-                              slot.is_available ? "text-emerald-600" : "text-amber-700"
+                              "block text-[10px] font-medium mt-0.5",
+                              slot.is_available ? "text-emerald-600 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
                             )}>
-                              {slot.is_available ? '● Available' : '● Reserved'}
+                              {slot.is_available ? 'Available' : 'Reserved'}
                             </span>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => handleDeleteSlot(slot.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                             title="Delete Slot"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1062,29 +1067,29 @@ export default function Appointments() {
           {/* TAB 4: DOCTOR CONSULTATION HISTORY */}
           {doctorActiveTab === 'history' && (
             <div className="space-y-4">
-              <h3 className="text-xl font-black text-slate-800">Completed & Past Appointments</h3>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Consultation History</h3>
               {doctorHistory.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
-                  <p className="text-sm text-slate-400 font-medium">No past appointments recorded.</p>
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No past or completed consultations recorded yet.</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
                   {doctorHistory.map(app => (
                     <div key={app.id} className="p-4 sm:p-5 flex items-center justify-between text-xs">
-                      <div className="space-y-1">
-                        <p className="font-bold text-slate-800">{app.patient_name} ({app.patient_email})</p>
-                        <p className="text-slate-400">{app.appointment_date} at {app.appointment_time} • On-Site Consultation</p>
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100">{app.patient_name} <span className="text-slate-400 font-normal">({app.patient_email})</span></p>
+                        <p className="text-slate-500 dark:text-slate-400">{app.appointment_date} at {app.appointment_time} • On-Site Consultation</p>
                         {app.rejection_reason && (
-                          <p className="text-rose-600 font-semibold italic text-[11px]">Rejection reason: {app.rejection_reason}</p>
+                          <p className="text-rose-600 dark:text-rose-400 font-medium text-xs pt-0.5">Decline reason: {app.rejection_reason}</p>
                         )}
                       </div>
                       <span className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                        app.status === 'COMPLETED' ? "bg-slate-100 text-slate-700" :
-                        app.status === 'REJECTED' ? "bg-rose-50 text-rose-700" :
-                        "bg-slate-100 text-slate-500"
+                        "px-2.5 py-0.5 rounded text-[11px] font-medium capitalize",
+                        app.status === 'COMPLETED' ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300" :
+                        app.status === 'REJECTED' ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300" :
+                        "bg-slate-100 dark:bg-slate-800 text-slate-500"
                       )}>
-                        {app.status}
+                        {app.status.toLowerCase()}
                       </span>
                     </div>
                   ))}
@@ -1103,33 +1108,33 @@ export default function Appointments() {
         <div className="space-y-6">
 
           {/* Patient Navigation Tabs */}
-          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
             <button
               onClick={() => setPatientActiveTab('book')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 patientActiveTab === 'book' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <Search className="w-4 h-4 text-emerald-500" />
-              <span>Find & Book Dentist</span>
+              <span>Book Appointment</span>
             </button>
 
             <button
               onClick={() => setPatientActiveTab('pending')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 patientActiveTab === 'pending' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <Clock className="w-4 h-4 text-amber-500" />
-              <span>My Pending Requests</span>
+              <span>Pending Requests</span>
               {patientPendingRequests.length > 0 && (
-                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full">
+                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
                   {patientPendingRequests.length}
                 </span>
               )}
@@ -1138,16 +1143,16 @@ export default function Appointments() {
             <button
               onClick={() => setPatientActiveTab('confirmed')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 patientActiveTab === 'confirmed' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               <span>Confirmed Visits</span>
               {patientConfirmedVisits.length > 0 && (
-                <span className="px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-full">
+                <span className="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
                   {patientConfirmedVisits.length}
                 </span>
               )}
@@ -1156,16 +1161,16 @@ export default function Appointments() {
             <button
               onClick={() => setPatientActiveTab('rejected')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 patientActiveTab === 'rejected' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <XCircle className="w-4 h-4 text-rose-500" />
               <span>Declined Requests</span>
               {patientRejectedRequests.length > 0 && (
-                <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-black rounded-full">
+                <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full">
                   {patientRejectedRequests.length}
                 </span>
               )}
@@ -1174,10 +1179,10 @@ export default function Appointments() {
             <button
               onClick={() => setPatientActiveTab('history')}
               className={cn(
-                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                "px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-xs",
                 patientActiveTab === 'history' 
-                  ? "bg-slate-900 text-white shadow-md" 
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  ? "bg-slate-900 text-white dark:bg-slate-800 shadow-xs font-semibold" 
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800"
               )}
             >
               <History className="w-4 h-4 text-slate-400" />
@@ -1192,81 +1197,78 @@ export default function Appointments() {
               {/* Search Dentists Directory */}
               <div className="space-y-3">
                 <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Search dentist by name or clinic location..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all shadow-xs"
+                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-medium text-slate-900 dark:text-slate-100 transition-colors shadow-xs"
                   />
                 </div>
               </div>
 
               {/* Doctors Directory Cards */}
               {filteredDoctors.length === 0 ? (
-                <div className="bg-white p-12 rounded-[2.5rem] border border-slate-200 text-center space-y-4 shadow-sm">
-                  <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto">
-                    <Stethoscope className="w-8 h-8" />
+                <div className="bg-white dark:bg-slate-900 p-10 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-3 shadow-xs">
+                  <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+                    <Stethoscope className="w-6 h-6 text-emerald-500" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-lg font-bold text-slate-800">No Registered Dentists Available</h4>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    <h4 className="text-base font-semibold text-slate-800 dark:text-slate-200">No Dentists Available</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                       {searchQuery 
                         ? "No dentists match your search filter." 
-                        : "There are currently no registered dentists in the system. Registered dentists will appear here once registered."}
+                        : "There are currently no registered dentists in the system. Registered dentists will appear here."}
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {filteredDoctors.map(docItem => (
                     <div
                       key={docItem.id}
-                      className="bg-white p-6 rounded-[2.5rem] border border-slate-200/90 shadow-sm hover:shadow-xl hover:shadow-slate-100 transition-all flex flex-col justify-between space-y-5 group"
+                      className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col justify-between space-y-4"
                     >
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-4">
-                          <div className="w-16 h-16 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-100 shrink-0">
+                      <div className="space-y-3.5">
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-13 h-13 rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
                             {docItem.image ? (
                               <img src={docItem.image} alt={docItem.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center font-black text-xl text-slate-400">
+                              <div className="w-full h-full flex items-center justify-center font-bold text-lg text-slate-400">
                                 {(docItem.name || 'D').charAt(0).toUpperCase()}
                               </div>
                             )}
                           </div>
                           <div>
-                            <h4 className="font-black text-slate-800 text-base">{docItem.name}</h4>
-                            <p className="text-xs font-bold text-emerald-600">Dental Surgeon</p>
-                            <p className="text-[11px] text-slate-400 font-medium">{docItem.education || 'BDS, MDS'}</p>
-                            <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
-                              <Star className="w-3.5 h-3.5 fill-amber-400" />
-                              <span>{docItem.rating || '5.0'}</span>
-                              <span className="text-[10px] text-slate-400">({docItem.reviews || 0} reviews)</span>
-                            </div>
+                            <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                              {docItem.name.startsWith('Dr.') ? docItem.name : `Dr. ${docItem.name}`}
+                            </h4>
+                            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Dental Surgeon</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{docItem.education || 'BDS, MDS'}</p>
                           </div>
                         </div>
 
-                        <div className="p-3 bg-slate-50/70 rounded-2xl space-y-1.5 text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-600 font-medium truncate">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1.5 text-xs">
+                          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium truncate">
                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{docItem.location}</span>
+                            <span className="truncate">{docItem.location || 'Raihan Dental Clinic'} (On-Site)</span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
                             <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span>{docItem.availableHours || '09:00 AM - 05:00 PM'}</span>
+                            <span>{docItem.availableHours || '09:00 AM – 05:00 PM'}</span>
                           </div>
-                          <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                            <span className="text-slate-400 font-semibold">Consultation Fee</span>
-                            <span className="font-black text-slate-800">${docItem.fee || 50}</span>
+                          <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700">
+                            <span className="text-slate-500 dark:text-slate-400">Consultation Fee</span>
+                            <span className="font-semibold text-slate-900 dark:text-slate-100">${docItem.fee || 50}</span>
                           </div>
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleOpenBookingModal(docItem)}
-                        className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-md shadow-slate-200 flex items-center justify-center gap-2 cursor-pointer group-hover:bg-emerald-600"
+                        className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                       >
                         <span>Request Appointment</span>
                         <ChevronRight className="w-4 h-4" />
@@ -1283,55 +1285,57 @@ export default function Appointments() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Your Submitted Requests</h3>
-                  <p className="text-xs text-slate-500 font-medium">These requests are awaiting review by your physician.</p>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Submitted Consultation Requests</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">These requests are awaiting review and confirmation by the dentist.</p>
                 </div>
-                <span className="text-xs font-bold text-slate-500">{patientPendingRequests.length} pending</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{patientPendingRequests.length} pending</span>
               </div>
 
               {patientPendingRequests.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
-                  <Clock className="w-12 h-12 text-slate-300 mx-auto" />
-                  <h4 className="font-bold text-slate-800 text-base">No Pending Requests</h4>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    You have no active pending requests. Search a doctor to request an appointment.
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <Clock className="w-10 h-10 text-slate-350 dark:text-slate-600 mx-auto" />
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">No Pending Requests</h4>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+                    You have no active pending requests. Browse available clinic slots to request an appointment.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {patientPendingRequests.map((appt) => (
-                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <div key={appt.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
                       <div className="flex items-start justify-between">
                         <div>
-                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
-                            ⏳ Awaiting Doctor Approval
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                            Awaiting Dentist Approval
                           </span>
-                          <h4 className="text-base font-bold text-slate-800 mt-2">Dr. {appt.doctor_name}</h4>
-                          <p className="text-xs text-emerald-600 font-bold">Dental Surgeon</p>
+                          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-2">
+                            {appt.doctor_name.startsWith('Dr.') ? appt.doctor_name : `Dr. ${appt.doctor_name}`}
+                          </h4>
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Dental Surgeon</p>
                         </div>
                         <div className="text-right text-xs">
-                          <p className="font-bold text-slate-700">{appt.appointment_date}</p>
-                          <p className="text-slate-400">{appt.appointment_time}</p>
+                          <p className="font-semibold text-slate-800 dark:text-slate-200">{appt.appointment_date}</p>
+                          <p className="text-slate-500 dark:text-slate-400">{appt.appointment_time}</p>
                         </div>
                       </div>
 
-                      <div className="p-3 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-1">
-                        <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Submitted Reason</span>
-                        <p className="text-xs text-slate-700 font-medium italic">"{appt.reason}"</p>
+                      <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-100 dark:border-amber-900/40 space-y-0.5">
+                        <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Submitted Reason</span>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 font-medium italic">"{appt.reason}"</p>
                       </div>
 
-                      <div className="p-3 bg-slate-50 rounded-xl flex items-center gap-2 text-xs text-slate-500 font-medium">
-                        <Info className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>The dentist will review your request. You will be notified when accepted.</span>
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                        <Info className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>The dentist will review your request. You will receive an instant notification when approved.</span>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                          🏥 On-Site Clinic Visit
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-800/60">
+                          On-Site Clinic Consultation
                         </span>
                         <button
                           onClick={() => handlePatientCancelRequest(appt.id)}
-                          className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                          className="text-xs font-medium text-rose-500 hover:text-rose-700 cursor-pointer"
                         >
                           Withdraw Request
                         </button>
@@ -1348,85 +1352,87 @@ export default function Appointments() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Confirmed Consultations</h3>
-                  <p className="text-xs text-slate-500 font-medium">Your approved on-site appointments at Raihan Dental Clinic.</p>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Confirmed Consultations</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Your approved on-site appointments at Raihan Dental Clinic.</p>
                 </div>
-                <span className="text-xs font-bold text-slate-500">{patientConfirmedVisits.length} approved</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{patientConfirmedVisits.length} approved</span>
               </div>
 
               {patientConfirmedVisits.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
-                  <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto" />
-                  <h4 className="font-bold text-slate-800 text-base">No Confirmed Visits Yet</h4>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <CheckCircle2 className="w-10 h-10 text-slate-350 dark:text-slate-600 mx-auto" />
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">No Confirmed Visits Yet</h4>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
                     Once the dentist approves your requested appointment, it will appear here with your confirmed clinic consultation schedule.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {patientConfirmedVisits.map((appt) => (
-                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <div key={appt.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-lg border border-emerald-200">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60">
                             {(appt.doctor_name || 'D').charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <h4 className="font-bold text-slate-800 text-sm">Dr. {appt.doctor_name}</h4>
-                            <p className="text-xs font-bold text-emerald-600">Dental Surgeon</p>
+                            <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                              {appt.doctor_name.startsWith('Dr.') ? appt.doctor_name : `Dr. ${appt.doctor_name}`}
+                            </h4>
+                            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Dental Surgeon</p>
                           </div>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                           Approved
                         </span>
                       </div>
 
-                      <div className="p-3 bg-slate-50 rounded-2xl space-y-1 text-xs">
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Date & Time</span>
-                          <span className="font-bold text-slate-800">{appt.appointment_date} at {appt.appointment_time}</span>
+                          <span className="text-slate-500 dark:text-slate-400">Date & Time</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{appt.appointment_date} at {appt.appointment_time}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Visit Location</span>
-                          <span className="font-bold text-slate-700">{appt.location || 'Raihan Dental Clinic (On-Site)'}</span>
+                          <span className="text-slate-500 dark:text-slate-400">Visit Location</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{appt.location || 'Raihan Dental Clinic (On-Site)'}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Visit Type</span>
-                          <span className="font-bold text-emerald-700">🏥 On-Site Dental Consultation</span>
+                          <span className="text-slate-500 dark:text-slate-400">Visit Type</span>
+                          <span className="font-medium text-emerald-700 dark:text-emerald-300">On-Site Dental Consultation</span>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleSyncToGoogleCalendar(appt)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors"
                           >
-                            <CalendarPlus className="w-3 h-3 text-emerald-600" />
-                            <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Cal'}</span>
+                            <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Calendar'}</span>
                           </button>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => navigate('/messages', { state: { targetEmail: appt.doctor_email, targetName: `Dr. ${appt.doctor_name}` } })}
-                            className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"
-                            title="Message Doctor"
+                            onClick={() => navigate('/messages', { state: { targetEmail: appt.doctor_email, targetName: appt.doctor_name.startsWith('Dr.') ? appt.doctor_name : `Dr. ${appt.doctor_name}` } })}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-emerald-600 rounded-lg transition-colors"
+                            title="Message Dentist"
                           >
                             <MessageSquare className="w-4 h-4" />
                           </button>
 
                           <button
                             onClick={() => navigate('/payments', { state: { appointmentId: appt.id, doctorName: appt.doctor_name, amount: 50 } })}
-                            className="p-2 hover:bg-amber-50 text-amber-600 rounded-lg"
-                            title="Pay Fee"
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-amber-600 rounded-lg transition-colors"
+                            title="View / Pay Invoice"
                           >
                             <CreditCard className="w-4 h-4" />
                           </button>
 
                           <button
                             onClick={() => handlePatientCancelRequest(appt.id)}
-                            className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                            className="text-xs font-medium text-rose-500 hover:text-rose-700 cursor-pointer ml-1"
                           >
                             Cancel
                           </button>
@@ -1444,33 +1450,35 @@ export default function Appointments() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Declined Consultation Requests</h3>
-                  <p className="text-xs text-slate-500 font-medium">Requests declined by doctors. You can review the reason and book an alternate slot.</p>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Declined Consultation Requests</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Requests that could not be accommodated. You may choose an alternate open slot.</p>
                 </div>
               </div>
 
               {patientRejectedRequests.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-2">
-                  <p className="text-sm font-bold text-slate-500">No declined requests.</p>
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">No declined requests.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {patientRejectedRequests.map((appt) => (
-                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <div key={appt.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
                       <div className="flex items-start justify-between">
                         <div>
-                          <h4 className="font-bold text-slate-800">Dr. {appt.doctor_name}</h4>
-                          <p className="text-xs text-slate-500">{appt.appointment_date} at {appt.appointment_time}</p>
+                          <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                            {appt.doctor_name.startsWith('Dr.') ? appt.doctor_name : `Dr. ${appt.doctor_name}`}
+                          </h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{appt.appointment_date} at {appt.appointment_time}</p>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60">
                           Declined
                         </span>
                       </div>
 
-                      <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 space-y-1">
-                        <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Doctor Feedback</span>
-                        <p className="text-xs text-rose-900 font-semibold leading-relaxed">
-                          "{appt.rejection_reason || 'Doctor unavailable at the requested time.'}"
+                      <div className="p-3 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/40 space-y-1">
+                        <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-300 uppercase tracking-wider">Dentist Feedback</span>
+                        <p className="text-xs text-rose-900 dark:text-rose-200 font-medium leading-relaxed">
+                          "{appt.rejection_reason || 'Dentist unavailable at the requested time.'}"
                         </p>
                       </div>
 
@@ -1478,16 +1486,16 @@ export default function Appointments() {
                         onClick={() => {
                           const docMatch = doctors.find(d => d.email === appt.doctor_email) || {
                             email: appt.doctor_email,
-                            name: `Dr. ${appt.doctor_name}`,
-                            specialty: appt.doctor_specialty,
-                            location: appt.location
+                            name: appt.doctor_name.startsWith('Dr.') ? appt.doctor_name : `Dr. ${appt.doctor_name}`,
+                            specialty: 'General Dentistry',
+                            location: appt.location || 'Raihan Dental Clinic'
                           };
                           handleOpenBookingModal(docMatch);
                         }}
-                        className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="w-full py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Choose Another Time Slot</span>
+                        <span>Select Alternate Time Slot</span>
                       </button>
                     </div>
                   ))}
@@ -1499,24 +1507,26 @@ export default function Appointments() {
           {/* TAB 5: PATIENT PAST VISITS */}
           {patientActiveTab === 'history' && (
             <div className="space-y-4">
-              <h3 className="text-xl font-black text-slate-800">Consultation History</h3>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Consultation History</h3>
               {patientHistory.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
-                  <p className="text-sm text-slate-400 font-medium">No past visits recorded.</p>
+                <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No past visits recorded.</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 shadow-xs">
                   {patientHistory.map(app => (
                     <div key={app.id} className="p-4 sm:p-5 flex items-center justify-between text-xs">
-                      <div className="space-y-1">
-                        <p className="font-bold text-slate-800">Dr. {app.doctor_name} (Dental Surgeon)</p>
-                        <p className="text-slate-400">{app.appointment_date} at {app.appointment_time}</p>
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100">
+                          {app.doctor_name.startsWith('Dr.') ? app.doctor_name : `Dr. ${app.doctor_name}`} (Dental Surgeon)
+                        </p>
+                        <p className="text-slate-500 dark:text-slate-400">{app.appointment_date} at {app.appointment_time}</p>
                       </div>
                       <span className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                        app.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                        "px-2.5 py-0.5 rounded text-[11px] font-medium capitalize",
+                        app.status === 'COMPLETED' ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                       )}>
-                        {app.status}
+                        {app.status.toLowerCase()}
                       </span>
                     </div>
                   ))}
@@ -1532,30 +1542,30 @@ export default function Appointments() {
       {/* 3. CALENDAR VIEW MODAL / TAB                                   */}
       {/* ============================================================== */}
       {viewMode === 'calendar' && (
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-fadeIn">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <div className="flex items-center gap-4">
-              <h2 className="text-xl font-black text-slate-800">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden animate-fadeIn">
+          <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                 {format(currentMonth, 'MMMM yyyy')}
               </h2>
               <div className="flex items-center gap-1">
                 <button 
                   onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                  className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-colors cursor-pointer"
                 >
-                  <ChevronLeft className="w-5 h-5 text-slate-600" />
+                  <ChevronLeft className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                 </button>
                 <button 
                   onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                  className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-colors cursor-pointer"
                 >
-                  <ChevronRight className="w-5 h-5 text-slate-600" />
+                  <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                 </button>
               </div>
             </div>
             <button 
               onClick={() => setCurrentMonth(new Date())}
-              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer"
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
             >
               Today
             </button>
@@ -1563,9 +1573,9 @@ export default function Appointments() {
 
           <div className="overflow-x-auto custom-scrollbar">
             <div className="min-w-[700px] md:min-w-0">
-              <div className="grid grid-cols-7 border-b border-slate-100">
+              <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <div key={day} className="py-2.5 text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     {day}
                   </div>
                 ))}
@@ -1581,15 +1591,15 @@ export default function Appointments() {
                     <div 
                       key={day.toString()} 
                       className={cn(
-                        "min-h-[110px] p-2 border-r border-b border-slate-100 transition-all hover:bg-slate-50/40",
-                        !isCurrentMonth && "bg-slate-50/50 opacity-40",
+                        "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-slate-800/80 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30",
+                        !isCurrentMonth && "bg-slate-50/30 dark:bg-slate-950/40 opacity-40",
                         idx % 7 === 6 && "border-r-0"
                       )}
                     >
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center justify-between mb-1">
                         <span className={cn(
-                          "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full",
-                          isToday ? "bg-emerald-600 text-white" : "text-slate-600"
+                          "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full",
+                          isToday ? "bg-emerald-600 text-white font-semibold" : "text-slate-700 dark:text-slate-300"
                         )}>
                           {format(day, 'd')}
                         </span>
@@ -1599,13 +1609,13 @@ export default function Appointments() {
                           <div 
                             key={app.id}
                             className={cn(
-                              "text-[9px] p-1.5 rounded-lg border truncate font-bold",
-                              app.status === 'ACCEPTED' ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
-                              app.status === 'PENDING' ? "bg-amber-50 border-amber-200 text-amber-800" :
-                              "bg-slate-50 border-slate-200 text-slate-600"
+                              "text-[10px] p-1 rounded-md border truncate font-medium",
+                              app.status === 'ACCEPTED' ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200" :
+                              app.status === 'PENDING' ? "bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200" :
+                              "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                             )}
                           >
-                            {app.appointment_time} - {isDoctor ? app.patient_name : app.doctor_name}
+                            {app.appointment_time} - {isDoctor ? app.patient_name : (app.doctor_name.startsWith('Dr.') ? app.doctor_name : `Dr. ${app.doctor_name}`)}
                           </div>
                         ))}
                       </div>
@@ -1623,70 +1633,70 @@ export default function Appointments() {
       {/* ============================================================== */}
       <AnimatePresence>
         {showBookingModal && bookingDoctor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 font-bold">
-                    <CalendarPlus className="w-6 h-6" />
+                  <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950/50 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <CalendarPlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-800">Request Dental Appointment</h3>
-                    <p className="text-xs text-slate-500 font-medium">Dr. {bookingDoctor.name} • On-Site Clinic Consultation</p>
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Request Dental Appointment</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {bookingDoctor.name.startsWith('Dr.') ? bookingDoctor.name : `Dr. ${bookingDoctor.name}`} • On-Site Consultation
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowBookingModal(false)}
-                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handlePatientSubmitRequest} className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+              <form onSubmit={handlePatientSubmitRequest} className="p-5 sm:p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
                 
-                {/* Section 1: Select Appointment Date */}
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                {/* Appointment Date */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <CalendarIcon className="w-4 h-4 text-emerald-600" />
-                    <span>Section 1: Select Appointment Date</span>
+                    <span>Appointment Date</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <input
-                        type="date"
-                        min={new Date().toISOString().split('T')[0]}
-                        value={bookingDate}
-                        onChange={(e) => {
-                          setBookingDate(e.target.value);
-                          setBookingTime('');
-                        }}
-                        className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-700 font-medium border border-slate-200 flex items-center gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      min={new Date().toISOString().split('T')[0]}
+                      value={bookingDate}
+                      onChange={(e) => {
+                        setBookingDate(e.target.value);
+                        setBookingTime('');
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs text-slate-700 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="truncate">{bookingDoctor.location || 'Raihan Dental Clinic'} (On-Site)</span>
+                      <span className="truncate">Raihan Dental Clinic (On-Site)</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Section 2: Select Available Time Slot */}
-                <div className="space-y-2.5">
+                {/* Available Time Slot */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-emerald-600" />
-                      <span>Section 2: Select Available Time Slot</span>
+                      <span>Available Time Slot</span>
                     </label>
-                    <span className="text-[11px] font-bold text-slate-400">
+                    <span className="text-[11px] text-slate-400">
                       {bookingDoctorSlots.filter((s: any) => s.is_available).length > 0 
-                        ? `${bookingDoctorSlots.filter((s: any) => s.is_available).length} slots configured` 
+                        ? `${bookingDoctorSlots.filter((s: any) => s.is_available).length} open slot(s)` 
                         : 'Standard clinic hours available'}
                     </span>
                   </div>
@@ -1713,53 +1723,53 @@ export default function Appointments() {
                           disabled={isReserved}
                           onClick={() => setBookingTime(slot.slot_time)}
                           className={cn(
-                            "p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center cursor-pointer",
+                            "p-2 rounded-xl border text-xs font-medium transition-all flex flex-col items-center cursor-pointer",
                             isSelected 
-                              ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200" 
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-xs" 
                               : isReserved 
-                                ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60" 
-                                : "bg-white border-slate-200 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50"
+                                ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed opacity-50" 
+                                : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30"
                           )}
                         >
                           <span>{slot.slot_time}</span>
-                          {isReserved && <span className="text-[8px] text-rose-500 font-black uppercase">Reserved</span>}
+                          {isReserved && <span className="text-[9px] text-rose-500 font-semibold">Reserved</span>}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Section 3: Reason for Dental Visit & Symptoms */}
+                {/* Reason for Dental Visit & Symptoms */}
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <FileText className="w-4 h-4 text-emerald-600" />
-                    <span>Section 3: Reason for Dental Visit & Symptoms</span>
+                    <span>Dental Concern / Reason for Visit</span>
                     <span className="text-rose-500">*</span>
                   </label>
                   
                   {/* Quick Dental Concern Chips */}
-                  <div className="flex flex-wrap gap-1.5 pb-1">
+                  <div className="flex flex-wrap gap-1.5 pb-0.5">
                     {[
-                      'Toothache and cold sensitivity',
-                      'Routine dental cleaning (Scaling)',
-                      'Broken filling or chipped tooth',
-                      'Bleeding or swollen gums',
-                      'Root canal pain evaluation',
-                      'Wisdom tooth discomfort',
-                      'Other dental concerns'
+                      'Toothache / Sensitivity',
+                      'Routine Dental Cleaning (Scaling)',
+                      'Broken Filling / Chipped Tooth',
+                      'Bleeding or Swollen Gums',
+                      'Root Canal Evaluation',
+                      'Wisdom Tooth Pain',
+                      'General Dental Consultation'
                     ].map(chip => (
                       <button
                         key={chip}
                         type="button"
                         onClick={() => setBookingReason(chip)}
                         className={cn(
-                          "px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer border",
+                          "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer border",
                           bookingReason === chip 
-                            ? "bg-emerald-600 text-white border-emerald-600" 
-                            : "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent"
+                            ? "bg-slate-900 text-white dark:bg-emerald-600 dark:text-white border-transparent" 
+                            : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
                         )}
                       >
-                        + {chip}
+                        {chip}
                       </button>
                     ))}
                   </div>
@@ -1769,45 +1779,47 @@ export default function Appointments() {
                     required
                     value={bookingReason}
                     onChange={(e) => setBookingReason(e.target.value)}
-                    placeholder="Describe your dental concern, symptoms, tooth location, or specific treatment requested..."
-                    className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all resize-none font-medium"
+                    placeholder="Describe your dental symptoms, affected tooth area, or reason for this visit..."
+                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-1 focus:ring-emerald-500 outline-none text-xs text-slate-900 dark:text-slate-100 transition-all resize-none font-medium"
                   />
                 </div>
 
-                {/* Section 4: Appointment Request Review & Summary */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-3">
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
-                    Section 4: Appointment Request Summary
-                  </label>
+                {/* Appointment Request Summary */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+                    Appointment Summary
+                  </span>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Selected Dentist</span>
-                      <span className="font-bold text-slate-800">Dr. {bookingDoctor.name}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Visit Type</span>
-                      <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] inline-block border border-emerald-200">
-                        🏥 On-Site Clinic Visit
+                      <span className="text-slate-400 block text-[11px]">Dentist</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        {bookingDoctor.name.startsWith('Dr.') ? bookingDoctor.name : `Dr. ${bookingDoctor.name}`}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Date & Time</span>
-                      <span className="font-bold text-slate-800">
-                        {bookingDate} • {bookingTime || '(Please select a slot)'}
+                      <span className="text-slate-400 block text-[11px]">Visit Location</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        Raihan Dental Clinic (On-Site)
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Dental Concern</span>
-                      <span className="font-bold text-slate-800 truncate block">
-                        {bookingReason || '(Select or enter concern)'}
+                      <span className="text-slate-400 block text-[11px]">Date & Time</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        {bookingDate} • {bookingTime || '(Select a time slot)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Concern</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
+                        {bookingReason || '(Enter reason)'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200/60 text-[11px] text-amber-800 flex items-start gap-1.5 font-medium">
-                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                     <span>
-                      Submitting this request creates a <strong>PENDING</strong> appointment. Dr. {bookingDoctor.name} will independently review and accept or decline your request based on clinic chair availability.
+                      Requests are submitted with <strong>Pending</strong> status. Dr. Raihan reviews and confirms appointments according to clinic chair capacity.
                     </span>
                   </div>
                 </div>
@@ -1817,7 +1829,7 @@ export default function Appointments() {
                   <button
                     type="submit"
                     disabled={isSubmittingBooking || !bookingTime}
-                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200 disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     {isSubmittingBooking ? (
                       <>
@@ -1843,39 +1855,39 @@ export default function Appointments() {
       {/* ============================================================== */}
       <AnimatePresence>
         {rejectingAppt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-slate-100"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 font-black">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
                   <XCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-800 text-base">Decline Appointment Request</h4>
-                  <p className="text-xs text-slate-400">Patient: {rejectingAppt.patient_name}</p>
+                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Decline Consultation Request</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Patient: {rejectingAppt.patient_name}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Rejection Reason (will be notified to patient)
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Reason for Declining (shared with patient)
                 </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
                   {[
-                    'Schedule conflict at this hour',
-                    'Please select an afternoon slot',
-                    'Clinical referral required',
-                    'Emergency hospital surgery'
+                    'Chair occupied for surgical procedure',
+                    'Please choose an afternoon slot',
+                    'Prior procedural appointment scheduled',
+                    'Dentist unavailable during this hour'
                   ].map(quickReason => (
                     <button
                       key={quickReason}
                       type="button"
                       onClick={() => setRejectionReason(quickReason)}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                      className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 text-[11px] font-medium rounded-lg transition-colors cursor-pointer"
                     >
                       {quickReason}
                     </button>
@@ -1886,16 +1898,16 @@ export default function Appointments() {
                   rows={3}
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explain why this request is declined or suggest an alternate slot..."
-                  className="w-full p-3 rounded-xl border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                  placeholder="Explain why this time slot cannot be accommodated or recommend an alternate time..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-rose-500 resize-none font-medium"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setRejectingAppt(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                  className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition-colors"
                 >
                   Cancel
                 </button>
@@ -1904,10 +1916,10 @@ export default function Appointments() {
                   type="button"
                   onClick={handleDoctorConfirmReject}
                   disabled={isSubmittingDecision}
-                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-medium shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                 >
                   {isSubmittingDecision ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                  <span>Decline & Release Slot</span>
+                  <span>Decline Request</span>
                 </button>
               </div>
             </motion.div>

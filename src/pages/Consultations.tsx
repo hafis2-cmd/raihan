@@ -11,10 +11,6 @@ import {
   Clock, 
   X, 
   Printer, 
-  ChevronRight, 
-  Info,
-  ShieldCheck,
-  AlertCircle,
   FileCheck
 } from 'lucide-react';
 import { useAuth, getRegisteredPatients } from '../context/AuthContext';
@@ -33,13 +29,12 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function Consultations() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist';
 
   const [consultations, setConsultations] = useState<DentalConsultation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedConsultation, setSelectedConsultation] = useState<DentalConsultation | null>(null);
 
   // Form State for new consultation
   const [formPatientEmail, setFormPatientEmail] = useState('');
@@ -63,10 +58,8 @@ export default function Consultations() {
     if (profile?.email) {
       const emailLower = profile.email.toLowerCase().trim();
       if (isDentist) {
-        // Dentists see consultations they conducted
         setConsultations(all.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower));
       } else {
-        // Patients see their own records
         setConsultations(all.filter(c => (c.patient_email || '').toLowerCase().trim() === emailLower));
       }
     } else {
@@ -139,7 +132,7 @@ export default function Consultations() {
         patient_email: formPatientEmail.trim(),
         patient_name: formPatientName.trim(),
         dentist_email: profile?.email || '',
-        dentist_name: profile?.name || 'Attending Dentist',
+        dentist_name: profile?.name || 'Dr. Raihan',
         consultation_date: formDate,
         complaints: formComplaints.trim(),
         examination_findings: formFindings.trim(),
@@ -152,7 +145,6 @@ export default function Consultations() {
       });
 
       setShowAddModal(false);
-      // Reset
       setFormComplaints('');
       setFormFindings('');
       setFormDiagnosis('');
@@ -174,6 +166,8 @@ export default function Consultations() {
       return;
     }
 
+    const docName = cons.dentist_name?.startsWith('Dr.') ? cons.dentist_name : `Dr. ${cons.dentist_name || 'Raihan'}`;
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -181,16 +175,16 @@ export default function Consultations() {
           <title>Dental Consultation Record - ${cons.patient_name}</title>
           <style>
             @page { size: A4; margin: 20mm; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; padding: 24px; line-height: 1.6; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; padding: 24px; line-height: 1.6; }
             .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #059669; padding-bottom: 16px; margin-bottom: 24px; }
-            .logo { font-size: 24px; font-weight: 900; color: #059669; }
+            .logo { font-size: 22px; font-weight: 800; color: #059669; }
             .sub { font-size: 13px; color: #64748b; font-weight: 600; }
-            .badge { display: inline-block; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+            .badge { display: inline-block; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 24px; }
-            .field-label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 2px; }
+            .field-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 2px; }
             .field-val { font-size: 14px; font-weight: 700; color: #0f172a; }
             .section { margin-bottom: 20px; }
-            .section-title { font-size: 12px; font-weight: 900; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
+            .section-title { font-size: 12px; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
             .section-content { font-size: 13px; color: #334155; line-height: 1.6; background: #ffffff; padding: 10px; border-left: 3px solid #059669; }
             .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; font-size: 12px; color: #64748b; }
             .sign-line { width: 200px; border-top: 1px solid #0f172a; text-align: center; padding-top: 6px; font-weight: 700; color: #0f172a; }
@@ -218,8 +212,8 @@ export default function Consultations() {
             </div>
             <div>
               <div class="field-label">Attending Dental Surgeon</div>
-              <div class="field-val">${cons.dentist_name}</div>
-              <div style="font-size: 11px; color: #64748b;">Chief Dental Surgeon (BDS, MDS)</div>
+              <div class="field-val">${docName}</div>
+              <div style="font-size: 11px; color: #64748b;">General Dental Practitioner (BDS, MDS)</div>
             </div>
           </div>
 
@@ -261,7 +255,7 @@ export default function Consultations() {
               Retain for personal dental health history.
             </div>
             <div class="sign-line">
-              ${cons.dentist_name}<br/>
+              ${docName}<br/>
               <span style="font-size: 10px; font-weight: normal; color: #64748b;">Attending Dentist Signature</span>
             </div>
           </div>
@@ -288,148 +282,146 @@ export default function Consultations() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-16">
+    <div className="max-w-6xl mx-auto space-y-6 pb-16">
       
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
               {isDentist ? 'Clinical Records & Treatments' : 'My Dental History'}
             </span>
-            <span className="text-xs text-slate-400 font-semibold">• Dental Care Management</span>
+            <span className="text-xs text-slate-400 font-medium">• Raihan Dental Clinic</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Dental Consultations & Treatment History
           </h1>
-          <p className="text-slate-500 font-medium text-sm md:text-base">
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
             {isDentist 
               ? 'Document patient complaints, dental examination findings, diagnoses, procedures performed, and follow-up care.'
-              : 'View your completed dental procedures, diagnostic reports, and oral care instructions from your dentist.'}
+              : 'Review your completed dental visits, intra-oral examination findings, diagnostic reports, and oral care instructions.'}
           </p>
         </div>
 
         {isDentist && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-6 py-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-md shadow-slate-200 flex items-center gap-2 cursor-pointer shrink-0"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center gap-2 cursor-pointer shrink-0 shadow-xs"
           >
-            <Plus className="w-4 h-4 text-emerald-400" />
+            <Plus className="w-4 h-4 text-white" />
             <span>Record Dental Consultation</span>
           </button>
         )}
       </div>
 
       {/* Search Bar */}
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search consultations by patient name, diagnosis, symptoms, or treatment..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3.5 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all shadow-xs"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          type="text"
+          placeholder="Search consultations by patient name, diagnosis, symptoms, or treatment..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none text-xs text-slate-900 dark:text-slate-100 transition-colors"
+        />
       </div>
 
       {/* Consultations List */}
       {filteredConsultations.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto">
-            <Stethoscope className="w-8 h-8 text-emerald-500" />
+        <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto border border-emerald-100 dark:border-emerald-800">
+            <Stethoscope className="w-6 h-6" />
           </div>
-          <h4 className="font-bold text-slate-800 text-base">No Consultation Records Found</h4>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
+          <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">No Consultation Records Found</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             {searchQuery 
               ? 'No dental consultation records match your search criteria.' 
               : isDentist 
-                ? 'Click "Record Dental Consultation" above to document a patient procedure.'
-                : 'Your dental consultations and treatment history will be displayed here.'}
+                ? 'Click "Record Dental Consultation" above to document a completed patient treatment.'
+                : 'Your dental consultations and completed treatment records will be displayed here.'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5">
+        <div className="grid grid-cols-1 gap-4">
           {filteredConsultations.map(cons => (
             <motion.div
               key={cons.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white p-6 sm:p-7 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-5"
+              className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4"
             >
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xl border border-emerald-200 shrink-0">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-200 dark:border-emerald-800 shrink-0">
                     {(cons.patient_name || 'P').charAt(0).toUpperCase()}
                   </div>
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-lg font-black text-slate-800">{cons.patient_name}</h4>
-                      <span className="px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{cons.patient_name}</h4>
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                         {cons.treatment_category}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 font-medium">
-                      Patient: {cons.patient_email} • Attending: {cons.dentist_name}
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Patient: {cons.patient_email} • Attending: {cons.dentist_name?.startsWith('Dr.') ? cons.dentist_name : `Dr. ${cons.dentist_name || 'Raihan'}`}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-start md:self-auto">
-                  <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 text-right space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Date</span>
-                    <span className="text-xs font-bold text-slate-800">{cons.consultation_date}</span>
+                  <div className="bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60 text-right space-y-0.5">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">Date</span>
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{cons.consultation_date}</span>
                   </div>
                   <button
                     onClick={() => handlePrint(cons)}
-                    className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                    className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
                     title="Print Dental Record"
                   >
-                    <Printer className="w-4 h-4 text-emerald-600" />
+                    <Printer className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   </button>
                 </div>
               </div>
 
               {/* Consultation Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 
                 {/* Patient Complaints */}
-                <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                     Chief Complaint & Symptoms
                   </span>
-                  <p className="text-xs text-slate-700 leading-relaxed font-semibold italic">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
                     "{cons.complaints}"
                   </p>
                 </div>
 
                 {/* Examination Findings */}
-                <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                     Dental Examination Findings
                   </span>
-                  <p className="text-xs text-slate-700 leading-relaxed font-semibold">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
                     {cons.examination_findings || 'Standard intra-oral clinical evaluation.'}
                   </p>
                 </div>
 
                 {/* Diagnosis */}
-                <div className="p-4 bg-emerald-50/40 rounded-2xl border border-emerald-100 space-y-1">
-                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block">
+                <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-800/50 space-y-1">
+                  <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
                     Clinical Diagnosis
                   </span>
-                  <p className="text-xs text-emerald-950 font-bold leading-relaxed">
+                  <p className="text-xs text-emerald-950 dark:text-emerald-200 font-semibold leading-relaxed">
                     {cons.diagnosis}
                   </p>
                 </div>
 
                 {/* Treatment Performed */}
-                <div className="p-4 bg-emerald-50/40 rounded-2xl border border-emerald-100 space-y-1">
-                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block">
+                <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-800/50 space-y-1">
+                  <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
                     Treatment Performed
                   </span>
-                  <p className="text-xs text-emerald-950 font-bold leading-relaxed">
+                  <p className="text-xs text-emerald-950 dark:text-emerald-200 font-semibold leading-relaxed">
                     {cons.treatment_performed}
                   </p>
                 </div>
@@ -437,15 +429,15 @@ export default function Consultations() {
               </div>
 
               {/* Follow-up & Next Visit */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
                 <div className="space-y-0.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Follow-up Instructions</span>
-                  <p className="text-slate-700 font-medium text-xs">{cons.follow_up_instructions}</p>
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">Follow-up Instructions</span>
+                  <p className="text-slate-700 dark:text-slate-300 font-normal text-xs">{cons.follow_up_instructions}</p>
                 </div>
 
                 {cons.next_visit_date && (
-                  <div className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <div className="bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 rounded-md border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-medium flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                     <span>Next Recall: {cons.next_visit_date}</span>
                   </div>
                 )}
@@ -459,38 +451,38 @@ export default function Consultations() {
       {/* Record Dental Consultation Modal */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 font-bold">
-                    <Stethoscope className="w-6 h-6" />
+                  <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-950/60 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">
+                    <Stethoscope className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-800">Record Dental Consultation</h3>
-                    <p className="text-xs text-slate-500 font-medium">Document clinical exam, diagnosis, and treatment</p>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Record Dental Consultation</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Document clinical exam, diagnosis, and treatment</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
+                  className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitConsultation} className="p-6 sm:p-8 space-y-5 overflow-y-auto custom-scrollbar flex-1 text-xs">
+              <form onSubmit={handleSubmitConsultation} className="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-xs">
                 
                 {/* Registered Patient Quick Picker */}
                 {registeredPatients.length > 0 && (
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">Select Registered Patient</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Select Registered Patient</label>
                     <select
                       onChange={(e) => {
                         const found = registeredPatients.find(p => p.email.toLowerCase() === e.target.value.toLowerCase());
@@ -499,7 +491,7 @@ export default function Consultations() {
                           setFormPatientEmail(found.email);
                         }
                       }}
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="">-- Choose registered patient or enter manually below --</option>
                       {registeredPatients.map(p => (
@@ -510,50 +502,50 @@ export default function Consultations() {
                 )}
 
                 {/* Patient & Date Selection */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">Patient Name</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Patient Name</label>
                     <input
                       type="text"
                       required
                       placeholder="e.g. Patient Full Name"
                       value={formPatientName}
                       onChange={(e) => setFormPatientName(e.target.value)}
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">Patient Email</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Patient Email</label>
                     <input
                       type="email"
                       required
                       placeholder="patient@example.com"
                       value={formPatientEmail}
                       onChange={(e) => setFormPatientEmail(e.target.value)}
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">Consultation Date</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Consultation Date</label>
                     <input
                       type="date"
                       required
                       value={formDate}
                       onChange={(e) => setFormDate(e.target.value)}
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">Treatment Category</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Treatment Category</label>
                     <select
                       value={formCategory}
                       onChange={(e) => handleCategoryChange(e.target.value as DentalTreatmentCategory)}
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       {DENTAL_TREATMENT_CATEGORIES.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
@@ -564,7 +556,7 @@ export default function Consultations() {
 
                 {/* Complaints */}
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-600 uppercase tracking-wider">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">
                     Patient Complaints <span className="text-rose-500">*</span>
                   </label>
                   <textarea
@@ -573,13 +565,13 @@ export default function Consultations() {
                     value={formComplaints}
                     onChange={(e) => setFormComplaints(e.target.value)}
                     placeholder="E.g., Sharp pain on lower molar when chewing, food traps between teeth..."
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                   />
                 </div>
 
                 {/* Examination Findings */}
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-600 uppercase tracking-wider">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">
                     Dental Examination Findings
                   </label>
                   <textarea
@@ -587,14 +579,14 @@ export default function Consultations() {
                     value={formFindings}
                     onChange={(e) => setFormFindings(e.target.value)}
                     placeholder="E.g., Tooth #36 occlusal decay, gingival sulcus depth 3mm, cold test sensitive..."
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                   />
                 </div>
 
                 {/* Diagnosis & Treatment Performed */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">
                       Diagnosis <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -603,12 +595,12 @@ export default function Consultations() {
                       value={formDiagnosis}
                       onChange={(e) => setFormDiagnosis(e.target.value)}
                       placeholder="E.g., Acute Pulpitis, Plaque-induced Gingivitis..."
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">
                       Treatment Performed
                     </label>
                     <input
@@ -616,15 +608,15 @@ export default function Consultations() {
                       value={formTreatmentPerformed}
                       onChange={(e) => setFormTreatmentPerformed(e.target.value)}
                       placeholder="E.g., Ultrasonic scaling, Composite restoration, RCT pulpectomy..."
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
                 {/* Follow-up & Next Visit */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-600 uppercase tracking-wider">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">
                       Follow-up & Oral Care Instructions
                     </label>
                     <textarea
@@ -632,28 +624,28 @@ export default function Consultations() {
                       value={formFollowUp}
                       onChange={(e) => setFormFollowUp(e.target.value)}
                       placeholder="E.g., Avoid hard foods for 24h, rinse with warm salt water twice daily..."
-                      className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium"
+                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                     />
                   </div>
 
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="font-bold text-slate-600 uppercase tracking-wider">Next Recommended Visit</label>
+                      <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Next Recommended Visit</label>
                       <input
                         type="date"
                         value={formNextVisit}
                         onChange={(e) => setFormNextVisit(e.target.value)}
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="font-bold text-slate-600 uppercase tracking-wider">Treatment Fee ($)</label>
+                      <label className="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">Treatment Fee ($)</label>
                       <input
                         type="number"
                         value={formCost}
                         onChange={(e) => setFormCost(Number(e.target.value))}
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
                   </div>
@@ -663,9 +655,9 @@ export default function Consultations() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200 cursor-pointer disabled:opacity-50"
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
                   >
-                    <FileCheck className="w-4 h-4 text-emerald-400" />
+                    <FileCheck className="w-4 h-4 text-white" />
                     <span>Save Consultation Record & Notify Patient</span>
                   </button>
                 </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { 
-  Activity, 
+  Stethoscope, 
   User, 
   Loader2, 
   Mail, 
@@ -35,12 +35,8 @@ export default function Login() {
 
     try {
       if (authMode === 'login') {
-        // Unified login: Both Dentists and Patients log in here.
-        // Role is determined strictly by the database account record.
         await loginWithEmail(email, password);
       } else if (authMode === 'signup') {
-        // Public registration: Strictly for Patients only.
-        // Public users cannot register as Dentists.
         if (!name.trim()) {
           setError('Please enter your full name.');
           setIsSubmitting(false);
@@ -54,83 +50,86 @@ export default function Login() {
         });
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please verify your details.');
+      setError(err.message || 'Authentication failed. Please check your credentials.');
       setIsSubmitting(false);
     }
   };
 
   if (user && profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
       </div>
     );
   }
 
   if (user && !profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mx-auto" />
-          <p className="text-sm font-bold text-slate-600">Loading your clinic dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Loading clinic account...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      {/* Background ambient accents */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-100/50 rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-100/50 rounded-full blur-3xl" />
-      </div>
-
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white/95 backdrop-blur-xl p-8 sm:p-10 rounded-[2.5rem] shadow-2xl border border-white/20 max-w-lg w-full relative z-10"
+        className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-md w-full relative z-10"
       >
-        <div className="flex flex-col items-center text-center space-y-5">
+        <div className="flex flex-col items-center text-center space-y-4">
+          
           {/* Logo icon */}
-          <div className="w-16 h-16 bg-emerald-600 rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-200 rotate-3">
-            <Activity className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-xs">
+            <Stethoscope className="w-6 h-6" />
           </div>
           
-          {/* Interface Heading & Description */}
-          <div className="space-y-1.5">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-snug uppercase">
-              RAIHAN – DENTAL CLINIC MANAGEMENT SYSTEM
+          {/* Header */}
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+              Raihan Dental Clinic
             </h1>
-            <p className="text-slate-500 font-medium text-xs sm:text-sm max-w-sm mx-auto">
+            <p className="text-slate-500 dark:text-slate-400 text-xs">
               {authMode === 'login'
-                ? "Welcome back! Sign in to access your dental clinic account."
-                : "Create your patient account to access dental appointments, consultations, prescriptions, and treatment records."}
+                ? "Sign in to access your dental consultations, appointments, and prescriptions."
+                : "Register a patient account to request visits and track dental care records."}
             </p>
           </div>
 
           <div className="w-full space-y-4 pt-1">
-            {/* Form Toggle: Sign In vs Patient Registration */}
-            <div className="grid grid-cols-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/60">
+            {/* Form Toggle */}
+            <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
                 onClick={() => { setAuthMode('login'); setError(''); }}
-                className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${authMode === 'login' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                  authMode === 'login' 
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
                 onClick={() => { setAuthMode('signup'); setError(''); }}
-                className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${authMode === 'signup' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                  authMode === 'signup' 
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
               >
                 Patient Sign Up
               </button>
             </div>
 
-            <form onSubmit={handleEmailAuth} className="w-full space-y-4 text-left">
+            <form onSubmit={handleEmailAuth} className="w-full space-y-3.5 text-left">
               {error && (
-                <div className="p-4 bg-rose-50 text-rose-600 text-xs sm:text-sm font-medium rounded-2xl border border-rose-100 flex items-start gap-2.5">
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-medium rounded-xl border border-rose-200 dark:border-rose-800 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
@@ -138,103 +137,101 @@ export default function Login() {
 
               {/* Patient Name (Sign Up only) */}
               {authMode === 'signup' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Patient Full Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-colors"
                       placeholder="e.g. Johnathan Smith"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Email Address (Common) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+              {/* Email Address */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-colors"
                     placeholder="name@example.com"
                   />
                 </div>
               </div>
 
-              {/* Password (Common) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+              {/* Password */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="password"
                     required
                     minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                    placeholder="At least 6 characters"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-colors"
+                    placeholder="••••••••"
                   />
                 </div>
               </div>
 
-              {/* Patient Additional Fields: Phone, DOB, Gender (Sign Up only) */}
+              {/* Patient Fields for Sign Up */}
               {authMode === 'signup' && (
                 <>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Phone Number
                     </label>
                     <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                        className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-colors"
                         placeholder="+1 (555) 000-0000"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                         Date of Birth
                       </label>
-                      <div className="relative">
-                        <input
-                          type="date"
-                          value={dob}
-                          onChange={(e) => setDob(e.target.value)}
-                          className="w-full p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
-                        />
-                      </div>
+                      <input
+                        type="date"
+                        value={dob}
+                        onChange={(e) => setDob(e.target.value)}
+                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                      />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                         Gender
                       </label>
                       <select
                         value={gender}
                         onChange={(e) => setGender(e.target.value as any)}
-                        className="w-full p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                       >
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
@@ -245,40 +242,42 @@ export default function Login() {
                 </>
               )}
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-200 disabled:opacity-50 cursor-pointer text-sm mt-2"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <ArrowRight className="w-5 h-5" />
-                )}
-                {authMode === 'login' ? 'Sign In to Portal' : 'Register New Account'}
-              </button>
+              {/* Submit */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer text-xs"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4" />
+                  )}
+                  <span>{authMode === 'login' ? 'Sign In' : 'Register Patient Account'}</span>
+                </button>
+              </div>
 
-              {/* Mode switch helper link */}
-              <div className="pt-2 text-center">
+              {/* Switch link */}
+              <div className="pt-1 text-center">
                 <button
                   type="button"
                   onClick={() => {
                     setAuthMode(authMode === 'login' ? 'signup' : 'login');
                     setError('');
                   }}
-                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
                 >
                   {authMode === 'login' 
-                    ? "New patient? Create your patient account" 
-                    : "Already registered? Sign In to your account"}
+                    ? "New patient? Register your account" 
+                    : "Already registered? Sign in to your account"}
                 </button>
               </div>
             </form>
           </div>
 
-          <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
-            Dentist accounts are securely provisioned by clinic administration. Contact management for credential access.
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 max-w-xs leading-relaxed">
+            Dentist accounts are authorized and provisioned by clinic administration.
           </p>
         </div>
       </motion.div>

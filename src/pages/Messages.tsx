@@ -5,9 +5,6 @@ import {
   Send, 
   Search, 
   User, 
-  MoreVertical, 
-  Phone, 
-  Video, 
   Info,
   ChevronLeft,
   Loader2,
@@ -16,29 +13,24 @@ import {
   Clock,
   Plus,
   X,
-  Calendar
+  Calendar,
+  Stethoscope
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getRegisteredPatients } from '../context/AuthContext';
 import { db } from '../firebase';
 import { 
   collection, 
   query, 
   where, 
-  orderBy, 
-  limit,
   getDocs, 
-  getDoc,
-  setDoc,
   doc, 
   updateDoc, 
   addDoc, 
-  deleteDoc, 
   onSnapshot 
 } from 'firebase/firestore';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import Markdown from 'react-markdown';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -99,135 +91,97 @@ export default function Messages() {
         const d = docSnap.data();
         list.push({
           id: docSnap.id,
-          participants: d.participants,
+          participants: d.participants || [],
           participantsData: d.participantsData || {},
           lastMessage: d.lastMessage,
-          lastMessageTimestamp: d.lastMessageTimestamp?.toDate ? d.lastMessageTimestamp.toDate().toISOString() : d.lastMessageTimestamp,
+          lastMessageTimestamp: d.lastMessageTimestamp,
           typing: d.typing || {},
-          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt
-        } as Conversation);
+          createdAt: d.createdAt
+        });
       });
-      list.sort((a, b) => new Date(b.lastMessageTimestamp || b.createdAt).getTime() - new Date(a.lastMessageTimestamp || a.createdAt).getTime());
+      list.sort((a, b) => {
+        const timeA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate().getTime() : 0;
+        const timeB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate().getTime() : 0;
+        return timeB - timeA;
+      });
       setConversations(list);
       setLoading(false);
     }, (err) => {
-      console.error('Error fetching conversations:', err);
+      console.warn('Error fetching conversations:', err);
       setLoading(false);
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [profile?.email]);
 
-  // Sync selected chat if it updates in the background
+  // Handle direct target email
   useEffect(() => {
-    if (selectedChat) {
-      const updated = conversations.find(c => c.id === selectedChat.id);
-      if (updated) setSelectedChat(updated);
-    }
-  }, [conversations]);
+    if (!targetEmail || !profile?.email || loading) return;
 
-  // Search for users to start a new chat
-  useEffect(() => {
-    if (!userSearchQuery.trim() || !profile?.role) {
-      setSearchResults([]);
-      return;
-    }
-
-    const searchUsers = async () => {
-      setSearchingUsers(true);
-      try {
-        const targetRole = profile.role === 'Patient' ? 'Doctor' : 'Patient';
-        const q = query(collection(db, 'users'), where('role', '==', targetRole));
-        const snapshot = await getDocs(q);
-        const results: any[] = [];
-        snapshot.forEach((docSnap) => {
-          const u = docSnap.data();
-          if (
-            u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-            u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
-          ) {
-            results.push({ id: docSnap.id, ...u });
-          }
-        });
-        setSearchResults(results);
-      } catch (error) {
-        console.error('Error searching users:', error);
-      } finally {
-        setSearchingUsers(false);
-      }
-    };
-
-    const timeoutId = setTimeout(searchUsers, 300);
-    return () => clearTimeout(timeoutId);
-  }, [userSearchQuery, profile?.role]);
-
-  const handleStartNewChat = async (targetUser: any) => {
-    const existing = conversations.find(c => 
-      c.participants.includes(targetUser.email)
+    const existingChat = conversations.find(c => 
+      c.participants.includes(targetEmail) && c.participants.includes(profile.email)
     );
 
-    if (existing) {
-      setSelectedChat(existing);
+    if (existingChat) {
+      setSelectedChat(existingChat);
     } else {
-      const convId = [profile!.email, targetUser.email].sort().join('_');
-      const participantsData = {
-        [profile!.email.replace(/\./g, '_')]: { name: profile!.name || 'Me', role: profile!.role || 'User' },
-        [targetUser.email.replace(/\./g, '_')]: { name: targetUser.name || 'User', role: targetUser.role || 'User' }
+      const initChat = async () => {
+        try {
+          const registered = getRegisteredPatients();
+          const targetPatient = registered.find(p => p.email.toLowerCase() === targetEmail.toLowerCase());
+          const targetName = targetPatient?.name || (targetEmail.includes('doctor') ? 'Dr. Raihan' : 'Patient');
+          const targetRole = targetEmail.includes('doctor') ? 'Doctor' : 'Patient';
+
+          const newConvRef = await addDoc(collection(db, 'conversations'), {
+            participants: [profile.email, targetEmail],
+            participantsData: {
+              [profile.email.replace(/\./g, '_')]: {
+                name: profile.name || (profile.role === 'Doctor' ? 'Dr. Raihan' : 'Patient'),
+                role: profile.role || 'Patient'
+              },
+              [targetEmail.replace(/\./g, '_')]: {
+                name: targetName,
+                role: targetRole
+              }
+            },
+            createdAt: new Date(),
+            lastMessage: 'Conversation opened',
+            lastMessageTimestamp: new Date()
+          });
+
+          setSelectedChat({
+            id: newConvRef.id,
+            participants: [profile.email, targetEmail],
+            participantsData: {
+              [profile.email.replace(/\./g, '_')]: {
+                name: profile.name || 'User',
+                role: profile.role || 'Patient'
+              },
+              [targetEmail.replace(/\./g, '_')]: {
+                name: targetName,
+                role: targetRole
+              }
+            },
+            createdAt: new Date()
+          });
+        } catch (e) {
+          console.error("Error creating conversation with target:", e);
+        }
       };
-
-      try {
-        const convRef = doc(db, 'conversations', convId);
-        await setDoc(convRef, {
-          participants: [profile!.email, targetUser.email],
-          participantsData,
-          lastMessageTimestamp: new Date(),
-          createdAt: new Date()
-        }, { merge: true });
-        
-        setSelectedChat({ id: convId, participants: [profile!.email, targetUser.email], participantsData, createdAt: new Date().toISOString() } as Conversation);
-      } catch (error) {
-        console.error('Error creating conversation:', error);
-      }
+      initChat();
     }
-    setShowNewChatModal(false);
-    setUserSearchQuery('');
-  };
+  }, [targetEmail, conversations, profile?.email, loading]);
 
-  // Handle "with" query param
+  // Fetch messages for selected chat
   useEffect(() => {
-    if (targetEmail && profile?.email && conversations.length >= 0) {
-      const existing = conversations.find(c => c.participants.includes(targetEmail));
-      if (existing) {
-        setSelectedChat(existing);
-      } else {
-        const fetchUser = async () => {
-          const q = query(collection(db, 'users'), where('email', '==', targetEmail), limit(1));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            handleStartNewChat({ id: snap.docs[0].id, ...snap.docs[0].data() });
-          }
-        };
-        fetchUser();
-      }
-    }
-  }, [targetEmail, profile?.email]);
-
-  // Fetch messages for selected conversation
-  useEffect(() => {
-    if (!profile?.email || !selectedChat) {
-      setMessages([]);
-      return;
-    }
+    if (!selectedChat) return;
 
     const q = query(
-      collection(db, 'conversations', selectedChat.id, 'messages'),
-      orderBy('timestamp', 'asc')
+      collection(db, 'conversations', selectedChat.id, 'messages')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
+      const list: Message[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
         list.push({
@@ -235,76 +189,49 @@ export default function Messages() {
           senderEmail: d.senderEmail,
           senderName: d.senderName,
           text: d.text,
-          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp,
+          timestamp: d.timestamp,
           readBy: d.readBy || {}
         });
       });
+      list.sort((a, b) => {
+        const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+        const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+        return timeA - timeB;
+      });
       setMessages(list);
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    }, (err) => {
-      console.error('Error fetching messages:', err);
     });
 
-    return () => {
-      unsubscribe();
-    };
-  }, [profile?.email, selectedChat?.id]);
+    return () => unsubscribe();
+  }, [selectedChat]);
 
-  // Listen for other user's status
+  // Auto-scroll messages
   useEffect(() => {
-    if (!selectedChat) {
-      setOtherUserStatus(null);
-      return;
-    }
-
-    const otherEmail = selectedChat.participants.find(e => e !== profile?.email);
-    if (!otherEmail) return;
-
-    const q = query(collection(db, 'users'), where('email', '==', otherEmail));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        setOtherUserStatus({
-          isOnline: data.isOnline || false,
-          lastSeen: data.lastSeen,
-          typingTo: data.typingTo || null
-        });
-      }
-    }, (err) => {
-      console.error('Error listening to user status:', err);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [selectedChat?.id, profile?.email]);
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Mark messages as read
   useEffect(() => {
-    if (!profile?.email || !selectedChat || messages.length === 0) return;
+    if (!messages.length || !profile?.email || !selectedChat) return;
 
     const unreadMessages = messages.filter(
-      msg => msg.senderEmail !== profile.email && (!msg.readBy || !msg.readBy[profile.email.replace(/\./g, '_')])
+      m => m.senderEmail !== profile.email && (!m.readBy || !m.readBy[profile.email.replace(/\./g, '_')])
     );
 
     if (unreadMessages.length > 0) {
       const markAsRead = async () => {
         for (const msg of unreadMessages) {
           try {
-            const updatedReadBy = { ...msg.readBy, [profile.email.replace(/\./g, '_')]: new Date().toISOString() };
             await updateDoc(doc(db, 'conversations', selectedChat.id, 'messages', msg.id), {
-              readBy: updatedReadBy
+              [`readBy.${profile.email.replace(/\./g, '_')}`]: new Date().toISOString()
             });
           } catch (error) {
-            console.error('Error marking message as read:', error);
+            console.error('Error marking message read:', error);
           }
         }
       };
       markAsRead();
     }
-  }, [messages, profile?.email, selectedChat?.id]);
+  }, [messages, profile?.email, selectedChat]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,26 +240,16 @@ export default function Messages() {
     const textPayload = newMessage.trim();
     setNewMessage('');
     setSending(true);
-    
-    // Clear typing status
-    try {
-      const currentTyping = selectedChat.typing || {};
-      const emailKey = profile.email.replace(/\./g, '_');
-      const { [emailKey]: _, ...rest } = currentTyping;
-      await updateDoc(doc(db, 'conversations', selectedChat.id), { typing: rest });
-    } catch (e) {}
 
     try {
-      // Add message
       await addDoc(collection(db, 'conversations', selectedChat.id, 'messages'), {
         text: textPayload,
         senderEmail: profile.email,
-        senderName: profile.name || (profile.role === 'Doctor' || profile.role === 'Dentist' ? 'Dentist' : 'Patient'),
+        senderName: profile.name || (profile.role === 'Doctor' ? 'Dr. Raihan' : 'Patient'),
         timestamp: new Date(),
         readBy: { [profile.email.replace(/\./g, '_')]: new Date().toISOString() }
       });
 
-      // Update conversation
       await updateDoc(doc(db, 'conversations', selectedChat.id), {
         lastMessage: textPayload,
         lastMessageTimestamp: new Date()
@@ -344,222 +261,251 @@ export default function Messages() {
     }
   };
 
-  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value);
+  const handleSearchUsers = () => {
+    setSearchingUsers(true);
+    const registered = getRegisteredPatients();
+    const queryLower = userSearchQuery.toLowerCase().trim();
+    
+    // Add default doctor if looking for care provider
+    const list: any[] = [
+      { name: 'Dr. Raihan', email: 'doctor@clinic.com', role: 'Doctor' },
+      ...registered.map(p => ({ name: p.name, email: p.email, role: 'Patient' }))
+    ];
 
-    if (!profile?.email || !selectedChat) return;
+    const filtered = list.filter(u => 
+      u.email.toLowerCase() !== (profile?.email || '').toLowerCase() &&
+      (u.name.toLowerCase().includes(queryLower) || u.email.toLowerCase().includes(queryLower))
+    );
 
-    const updateTypingStatus = async (isTyping: boolean) => {
-      try {
-        const emailKey = profile.email!.replace(/\./g, '_');
-        const currentTyping = selectedChat.typing || {};
-        let newTyping: any;
-        if (isTyping) {
-          newTyping = { ...currentTyping, [emailKey]: new Date().toISOString() };
-        } else {
-          const { [emailKey]: _, ...rest } = currentTyping;
-          newTyping = rest;
-        }
+    setSearchResults(filtered);
+    setSearchingUsers(false);
+  };
 
-        const userRef = doc(db, 'users', user.uid || user.id);
-        const convRef = doc(db, 'conversations', selectedChat.id);
-        const targetEmailVal = targetEmail || selectedChat.participants.find(p => p !== profile.email);
+  useEffect(() => {
+    if (showNewChatModal) {
+      handleSearchUsers();
+    }
+  }, [userSearchQuery, showNewChatModal]);
 
-        await Promise.all([
-          updateDoc(convRef, { typing: newTyping }),
-          updateDoc(userRef, { typingTo: isTyping ? targetEmailVal : null })
-        ]);
-      } catch (error) {
-        console.error('Error updating typing status:', error);
-      }
-    };
+  const handleStartNewChat = async (targetUser: any) => {
+    if (!profile?.email) return;
 
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
+    const existingChat = conversations.find(c => 
+      c.participants.includes(targetUser.email) && c.participants.includes(profile.email)
+    );
+
+    if (existingChat) {
+      setSelectedChat(existingChat);
+      setShowNewChatModal(false);
+      return;
     }
 
-    updateTypingStatus(true);
+    try {
+      const newConvRef = await addDoc(collection(db, 'conversations'), {
+        participants: [profile.email, targetUser.email],
+        participantsData: {
+          [profile.email.replace(/\./g, '_')]: {
+            name: profile.name || (profile.role === 'Doctor' ? 'Dr. Raihan' : 'Patient'),
+            role: profile.role || 'Patient'
+          },
+          [targetUser.email.replace(/\./g, '_')]: {
+            name: targetUser.name || 'User',
+            role: targetUser.role || 'Patient'
+          }
+        },
+        createdAt: new Date(),
+        lastMessage: 'Conversation opened',
+        lastMessageTimestamp: new Date()
+      });
 
-    typingTimeoutRef.current = setTimeout(() => {
-      updateTypingStatus(false);
-    }, 3000);
+      setSelectedChat({
+        id: newConvRef.id,
+        participants: [profile.email, targetUser.email],
+        participantsData: {
+          [profile.email.replace(/\./g, '_')]: {
+            name: profile.name || 'User',
+            role: profile.role || 'Patient'
+          },
+          [targetUser.email.replace(/\./g, '_')]: {
+            name: targetUser.name || 'User',
+            role: targetUser.role || 'Patient'
+          }
+        },
+        createdAt: new Date()
+      });
+      setShowNewChatModal(false);
+    } catch (e) {
+      console.error('Error starting conversation:', e);
+    }
   };
 
   if (loading) {
     return (
-      <div className="h-[calc(100vh-120px)] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+      <div className="h-[calc(100vh-140px)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
       </div>
     );
   }
 
+  const otherParticipant = selectedChat 
+    ? selectedChat.participants.find(e => e.toLowerCase() !== profile?.email.toLowerCase())
+    : null;
+  const otherData = (selectedChat && otherParticipant) 
+    ? (selectedChat.participantsData[otherParticipant.replace(/\./g, '_')] || { name: otherParticipant, role: 'Patient' })
+    : null;
+
   return (
-    <div className="h-[calc(100vh-120px)] flex gap-6 overflow-hidden">
-      {/* Sidebar */}
+    <div className="h-[calc(100vh-140px)] flex gap-4 overflow-hidden">
+      
+      {/* Conversations List Sidebar */}
       <div className={cn(
-        "w-full md:w-80 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden transition-all",
+        "w-full md:w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden transition-all",
         selectedChat && "hidden md:flex"
       )}>
-        <div className="p-6 border-b border-slate-100 space-y-4">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Messages</h2>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Messages</h2>
             <button 
               onClick={() => setShowNewChatModal(true)}
-              className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all"
+              className="p-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
+              title="New Message"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input 
               type="text" 
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {conversations.filter(c => {
-            const otherEmail = c.participants.find(e => e !== profile?.email);
-            const otherName = c.participantsData[otherEmail || '']?.name || 'User';
-            return otherName.toLowerCase().includes(searchQuery.toLowerCase());
+            const other = c.participants.find(e => e !== profile?.email);
+            const name = c.participantsData[other?.replace(/\./g, '_') || '']?.name || other || '';
+            return name.toLowerCase().includes(searchQuery.toLowerCase());
           }).length > 0 ? (
             conversations
               .filter(c => {
-                const otherEmail = c.participants.find(e => e !== profile?.email);
-                const otherName = c.participantsData[otherEmail || '']?.name || 'User';
-                return otherName.toLowerCase().includes(searchQuery.toLowerCase());
+                const other = c.participants.find(e => e !== profile?.email);
+                const name = c.participantsData[other?.replace(/\./g, '_') || '']?.name || other || '';
+                return name.toLowerCase().includes(searchQuery.toLowerCase());
               })
               .map((conv) => {
-                const otherEmail = conv.participants.find(e => e !== profile?.email);
-                const otherData = conv.participantsData[otherEmail || ''];
-                // Count unread (not exact but a good proxy)
-                const unread = false; // Simplified for now as we don't have unread count in conv doc easily
-                
+                const other = conv.participants.find(e => e !== profile?.email);
+                const data = conv.participantsData[other?.replace(/\./g, '_') || ''] || { name: other, role: 'Patient' };
+                const isSelected = selectedChat?.id === conv.id;
+
                 return (
                   <button
                     key={conv.id}
                     onClick={() => setSelectedChat(conv)}
                     className={cn(
-                      "w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-all border-b border-slate-50",
-                      selectedChat?.id === conv.id && "bg-emerald-50/50 border-emerald-100"
+                      "w-full p-3.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors border-b border-slate-100 dark:border-slate-800/60 cursor-pointer text-left",
+                      isSelected && "bg-emerald-50/60 dark:bg-emerald-950/30 border-l-4 border-l-emerald-600"
                     )}
                   >
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold shrink-0 bg-slate-100 text-slate-500">
-                      {otherData?.name?.[0]?.toUpperCase() || "U"}
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      {(data.name || 'U').charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex justify-between items-start mb-0.5">
-                        <h4 className="font-bold text-slate-800 truncate">
-                          {otherData?.name || otherEmail}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 truncate text-xs">
+                          {data.name || other}
                         </h4>
                         {conv.lastMessageTimestamp && (
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">
-                            {new Date(conv.lastMessageTimestamp?.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(conv.lastMessageTimestamp?.toDate ? conv.lastMessageTimestamp.toDate() : conv.lastMessageTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                       </div>
-                      <div className="flex justify-between items-center">
-                        <p className="text-xs text-slate-500 truncate font-medium flex-1">{conv.lastMessage || "No messages yet"}</p>
-                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {conv.lastMessage || "No messages yet"}
+                      </p>
                     </div>
                   </button>
                 );
               })
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
-                <MessageSquare className="w-8 h-8" />
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3">
+              <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
+                <MessageSquare className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <p className="text-slate-800 font-bold">No messages yet</p>
-                <p className="text-xs text-slate-500">Connect with your patient or doctor directly through your appointments.</p>
+                <p className="text-slate-800 dark:text-slate-200 font-semibold text-xs">No conversations</p>
+                <p className="text-[11px] text-slate-400 max-w-xs">Start a secure conversation with your dentist or registered patient.</p>
               </div>
               <button 
-                onClick={() => navigate('/appointments')}
-                className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-500 transition-all"
+                onClick={() => setShowNewChatModal(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition-colors cursor-pointer shadow-xs"
               >
-                View Appointments
+                Start New Chat
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Chat Window */}
+      {/* Main Chat Box */}
       <div className={cn(
-        "flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden transition-all",
+        "flex-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden transition-all",
         !selectedChat && "hidden md:flex"
       )}>
-        {selectedChat ? (
+        {selectedChat && otherData ? (
           <>
-            {/* Chat Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md z-10">
-              <div className="flex items-center gap-4">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 z-10">
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={() => setSelectedChat(null)}
-                  className="md:hidden p-2 hover:bg-slate-50 rounded-xl text-slate-400"
+                  className="md:hidden p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold bg-emerald-100 text-emerald-600">
-                  {selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.name?.[0]?.toUpperCase() || "U"}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                  {(otherData.name || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-800 tracking-tight">
-                    {selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.name || "Care Member"}
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                    {otherData.name}
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      otherUserStatus?.isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
-                    )} />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {otherUserStatus?.isOnline ? 'Online' : (
-                        otherUserStatus?.lastSeen 
-                          ? `Last seen ${new Date(otherUserStatus.lastSeen.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                          : (selectedChat.participantsData[selectedChat.participants.find(e => e !== profile?.email)!]?.role || 'Member')
-                      )}
-                    </span>
-                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    {otherParticipant} • {otherData.role || 'Patient'}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="p-3 hover:bg-slate-50 rounded-xl text-slate-400 transition-all">
-                  <Phone className="w-5 h-5" />
-                </button>
+
+              <div className="flex items-center gap-1.5">
                 <button 
                   onClick={() => navigate('/appointments')}
-                  className="p-3 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-emerald-600 transition-all"
-                  title="Schedule Appointment"
+                  className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  title="Appointments"
                 >
-                  <Calendar className="w-5 h-5" />
-                </button>
-                <button className="p-3 hover:bg-slate-50 rounded-xl text-slate-400 transition-all">
-                  <Info className="w-5 h-5" />
+                  <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="hidden sm:inline">Appointments</span>
                 </button>
               </div>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-slate-50/30">
-              <div className="flex justify-center mb-6">
-                <div className="bg-amber-50 border border-amber-100 px-4 py-2 rounded-xl flex items-center gap-2">
-                  <Info className="w-3.5 h-3.5 text-amber-600" />
-                  <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
-                    Secure messaging for non-urgent queries. In case of emergency, call 911.
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-slate-50/50 dark:bg-slate-950/40">
+              <div className="flex justify-center mb-2">
+                <div className="bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                  <Info className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <p className="text-[10px] font-medium text-emerald-800 dark:text-emerald-300">
+                    Direct clinic message thread. For immediate dental emergencies, please call the clinic desk directly.
                   </p>
                 </div>
               </div>
 
-              {messages.map((msg, idx) => {
-                const isMe = msg.senderEmail === profile?.email;
-                const otherEmail = selectedChat.participants.find(e => e !== profile?.email);
-                const isReadByOther = otherEmail && msg.readBy && msg.readBy[otherEmail.replace(/\./g, '_')];
+              {messages.map((msg) => {
+                const isMe = msg.senderEmail.toLowerCase() === profile?.email.toLowerCase();
                 
                 return (
                   <div 
@@ -570,155 +516,118 @@ export default function Messages() {
                     )}
                   >
                     <div className={cn(
-                      "max-w-[85%] p-4 rounded-2xl text-sm font-medium shadow-sm transition-all",
+                      "max-w-[80%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed transition-all shadow-xs",
                       isMe 
-                        ? "bg-emerald-600 text-white rounded-tr-none" 
-                        : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
+                        ? "bg-emerald-600 text-white rounded-tr-xs" 
+                        : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-tl-xs"
                     )}>
                       {msg.text}
                     </div>
                     <div className={cn(
-                      "flex items-center gap-1.5 mt-1 px-1",
+                      "flex items-center gap-1 mt-1 px-1",
                       isMe ? "flex-row-reverse" : "flex-row"
                     )}>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">
-                        {msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
+                      <span className="text-[9px] text-slate-400">
+                        {msg.timestamp?.toDate ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sent'}
                       </span>
-                      {isMe && (
-                        isReadByOther ? (
-                          <CheckCheck className="w-3 h-3 text-emerald-500" />
-                        ) : (
-                          <Check className="w-3 h-3 text-slate-300" />
-                        )
-                      )}
+                      {isMe && <CheckCheck className="w-3 h-3 text-emerald-500" />}
                     </div>
                   </div>
                 );
               })}
               
-              {(() => {
-                const otherEmail = selectedChat.participants.find(e => e !== profile?.email);
-                const isTyping = Boolean(otherEmail && selectedChat.typing && selectedChat.typing[otherEmail.replace(/\./g, '_')]);
-                
-                if (isTyping) {
-                  return (
-                    <div className="flex flex-col items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <div className="bg-white text-slate-400 border border-slate-100 p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" />
-                        <span className="text-[10px] font-black ml-1 uppercase tracking-widest text-emerald-500">
-                          Typing...
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-              
               <div ref={scrollRef} />
             </div>
 
-            {/* Input Area */}
-            <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-100">
-              <div className="relative flex items-center gap-4">
-                <div className="flex-1 relative">
-                  <input 
-                    type="text" 
-                    value={newMessage}
-                    onChange={handleTyping}
-                    placeholder="Type a message..."
-                    className="w-full pl-6 pr-14 py-4 bg-slate-50 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-slate-700"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <button type="button" className="p-2 text-slate-400 hover:text-slate-600 transition-all">
-                      <Clock className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
+            {/* Composer */}
+            <form onSubmit={handleSendMessage} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message to dentist or patient..."
+                  className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none text-xs text-slate-900 dark:text-slate-100 transition-colors"
+                />
                 <button 
                   type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className="p-4 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
                 >
                   {sending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Send className="w-5 h-5" />
+                    <Send className="w-4 h-4" />
                   )}
                 </button>
               </div>
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-6">
-            <div className="w-32 h-32 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
-              <MessageSquare className="w-16 h-16" />
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3">
+            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400">
+              <MessageSquare className="w-6 h-6" />
             </div>
-            <div className="max-w-xs space-y-2">
-              <h3 className="text-2xl font-black text-slate-800 tracking-tight">Select a conversation</h3>
-              <p className="text-slate-500 font-medium">Choose a chat from the sidebar to start messaging with your healthcare provider.</p>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight">Select a conversation</h3>
+              <p className="text-xs text-slate-400 max-w-xs">Choose a patient or dentist thread from the left to start communication.</p>
             </div>
           </div>
         )}
       </div>
+
       {/* New Chat Modal */}
       <AnimatePresence>
         {showNewChatModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+              exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col"
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-xl font-black text-slate-800">New Message</h3>
-                <button onClick={() => setShowNewChatModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
-                  <X className="w-5 h-5 text-slate-400" />
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Start Direct Message</h3>
+                <button onClick={() => setShowNewChatModal(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-4 space-y-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input 
                     type="text" 
-                    placeholder={profile?.role === 'Patient' ? "Search doctors..." : "Search patients..."}
+                    placeholder="Search by name or email..."
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     autoFocus
                   />
                 </div>
 
-                <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
+                <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
                   {searchingUsers ? (
-                    <div className="py-8 text-center">
-                      <Loader2 className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
+                    <div className="py-6 text-center">
+                      <Loader2 className="w-5 h-5 text-emerald-600 animate-spin mx-auto" />
                     </div>
                   ) : searchResults.length > 0 ? (
-                    searchResults.map((user) => (
+                    searchResults.map((target) => (
                       <button
-                        key={user.email}
-                        onClick={() => handleStartNewChat(user)}
-                        className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl transition-all text-left group"
+                        key={target.email}
+                        onClick={() => handleStartNewChat(target)}
+                        className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors text-left cursor-pointer"
                       >
-                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black text-sm group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-all">
-                          {(user.name || 'U').charAt(0).toUpperCase()}
+                        <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs border border-emerald-200 dark:border-emerald-800">
+                          {(target.name || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-800">{user.name || 'User'}</p>
-                          <p className="text-[10px] text-slate-500 font-medium">{user.email}</p>
+                          <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{target.name || 'User'}</p>
+                          <p className="text-[10px] text-slate-400">{target.email} • {target.role}</p>
                         </div>
                       </button>
                     ))
-                  ) : userSearchQuery ? (
-                    <p className="py-8 text-center text-sm text-slate-500 font-medium">No users found.</p>
                   ) : (
-                    <p className="py-8 text-center text-sm text-slate-400 font-medium italic">
-                      Type to search for {profile?.role === 'Patient' ? "doctors" : "patients"}...
-                    </p>
+                    <p className="py-6 text-center text-xs text-slate-400">No members found.</p>
                   )}
                 </div>
               </div>
