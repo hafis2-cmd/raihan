@@ -15,7 +15,8 @@ import {
   CheckCheck,
   Clock,
   Plus,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
@@ -560,13 +561,13 @@ export default function Messages() {
               </div>
               <div className="space-y-1">
                 <p className="text-slate-800 font-bold">No messages yet</p>
-                <p className="text-xs text-slate-500">Start a conversation with a doctor from the Doctors page.</p>
+                <p className="text-xs text-slate-500">Connect with your patient or doctor directly through your appointments.</p>
               </div>
               <button 
-                onClick={() => navigate('/doctors')}
+                onClick={() => navigate('/appointments')}
                 className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-500 transition-all"
               >
-                Find Doctors
+                View Appointments
               </button>
             </div>
           )}
@@ -630,10 +631,11 @@ export default function Messages() {
                   <Phone className="w-5 h-5" />
                 </button>
                 <button 
-                  onClick={() => navigate('/consultation')}
-                  className="p-3 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"
+                  onClick={() => navigate('/appointments')}
+                  className="p-3 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-emerald-600 transition-all"
+                  title="Schedule Appointment"
                 >
-                  <Video className="w-5 h-5" />
+                  <Calendar className="w-5 h-5" />
                 </button>
                 <button className="p-3 hover:bg-slate-50 rounded-xl text-slate-400 transition-all">
                   <Info className="w-5 h-5" />

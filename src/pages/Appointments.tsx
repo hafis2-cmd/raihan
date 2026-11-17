@@ -20,7 +20,10 @@ import {
   Video,
   Bell,
   CalendarPlus,
-  Check
+  Check,
+  MessageSquare,
+  FileText,
+  CreditCard
 } from 'lucide-react';
 import { 
   format, 
@@ -185,15 +188,15 @@ export default function Appointments() {
       const otherPersonName = isDoc ? app.patientName || app.patientEmail.split('@')[0] : app.doctorName;
       
       const summary = isDoc 
-        ? `TeleMed Appointment: ${otherPersonName}` 
-        : `Telehealth Consultation: Dr. ${otherPersonName}`;
+        ? `Raihan TeleMed Appointment: ${otherPersonName}` 
+        : `Raihan TeleMed Consultation: Dr. ${otherPersonName}`;
         
       const description = `Your telehealth consultation session.\n\n` +
         `Patient: ${app.patientName || app.patientEmail}\n` +
         `Physician: Dr. ${app.doctorName} (${app.doctorSpecialty || ''})\n` +
-        `Clinical Location: ${app.location || 'TeleMed Virtual Clinic'}\n\n` +
-        `💬 JOIN CONSULTATION portal: ${window.location.origin}/consultation\n\n` +
-        `* Please ensure you are logged strictly into your TeleMed dashboard prior to joining the video room.`;
+        `Clinical Location: ${app.location || 'Raihan TeleMed Virtual Clinic'}\n\n` +
+        `💬 Raihan TeleMed Portal: ${window.location.origin}/messages\n\n` +
+        `* Please ensure you are logged strictly into your Raihan TeleMed dashboard.`;
 
       const eventPayload = {
         summary: summary,
@@ -967,19 +970,48 @@ export default function Appointments() {
                             Error
                           </span>
                         )}
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => navigate('/consultation', { 
+                            onClick={() => navigate('/messages', { 
                               state: { 
                                 targetEmail: profile?.role === 'Doctor' ? app.patientEmail : app.doctorEmail,
-                                targetName: profile?.role === 'Doctor' ? app.patientEmail.split('@')[0] : app.doctorName
+                                targetName: profile?.role === 'Doctor' ? (app.patientName || app.patientEmail.split('@')[0]) : app.doctorName
                               } 
                             })}
-                            className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                            title="Start Video Call"
+                            className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                            title="Message"
                           >
-                            <Video className="w-3 h-3" />
+                            <MessageSquare className="w-3.5 h-3.5" />
                           </button>
+                          {profile?.role === 'Doctor' && (
+                            <button
+                              onClick={() => navigate('/prescriptions', { 
+                                state: { 
+                                  patientEmail: app.patientEmail,
+                                  patientName: app.patientName || app.patientEmail.split('@')[0]
+                                } 
+                              })}
+                              className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                              title="Write Prescription"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {profile?.role !== 'Doctor' && app.status === 'booked' && (
+                            <button
+                              onClick={() => navigate('/payments', { 
+                                state: { 
+                                  appointmentId: app.id,
+                                  doctorName: app.doctorName,
+                                  amount: 50
+                                } 
+                              })}
+                              className="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors"
+                              title="Pay Consultation Fee"
+                            >
+                              <CreditCard className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {profile?.role === 'Doctor' && (
                             <button
                               onClick={() => handleUpdateStatus(app.id, 'completed')}

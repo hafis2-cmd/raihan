@@ -47,7 +47,90 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all');
+  const handleDownloadReceipt = (p: Payment) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt - ${p.id.slice(0, 8).toUpperCase()}</title>
+          <style>
+            @page { size: A4; margin: 15mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; padding: 24px; line-height: 1.5; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: 800; color: #059669; }
+            .paid-badge { display: inline-block; background: #dcfce7; color: #15803d; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; }
+            .box { background: #f8fafc; border-radius: 12px; padding: 16px; margin-bottom: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+            th { background: #f1f5f9; text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+            td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+            .total-row { font-size: 16px; font-weight: 800; }
+            .footer { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="logo">🌿 Raihan TeleMed</div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Payment Invoice & Official Receipt</div>
+            </div>
+            <div style="text-align: right;">
+              <span class="paid-badge">✔ ${p.status.toUpperCase()}</span>
+              <div style="font-size: 12px; color: #64748b; margin-top: 6px;">Receipt #${p.id.slice(0, 8).toUpperCase()}</div>
+            </div>
+          </div>
+
+          <div class="box">
+            <div>
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Patient Info</div>
+              <div style="font-weight: 700; margin-top: 4px;">${p.patientName || p.patientEmail}</div>
+              <div style="font-size: 12px; color: #64748b;">${p.patientEmail}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Transaction Info</div>
+              <div style="margin-top: 4px; font-size: 13px;">Date: ${p.timestamp ? new Date(p.timestamp).toLocaleDateString() : new Date().toLocaleDateString()}</div>
+              <div style="font-size: 12px; color: #64748b;">Method: ${p.method || 'Card / Digital Transfer'}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Service Description</th>
+                <th style="text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>${p.description || 'Clinical Teleconsultation Fee'}</strong><br/>
+                  <span style="font-size: 12px; color: #64748b;">Clinical medical service provided on Raihan TeleMed.</span>
+                </td>
+                <td style="text-align: right; font-weight: 700;">$${p.amount.toFixed(2)}</td>
+              </tr>
+              <tr class="total-row">
+                <td>Total Amount Paid</td>
+                <td style="text-align: right; color: #059669;">$${p.amount.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Thank you for choosing Raihan TeleMed.<br/>
+            For billing inquiries or insurance claim copies, contact support@raihantelemed.com
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -258,7 +341,11 @@ export default function Payments() {
                             Pay Now
                           </button>
                         ) : (
-                          <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
+                          <button 
+                            onClick={() => handleDownloadReceipt(payment)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                            title="Download PDF Receipt"
+                          >
                             <Download className="w-4 h-4" />
                           </button>
                         )}

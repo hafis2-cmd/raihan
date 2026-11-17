@@ -212,7 +212,16 @@ export default function Prescriptions() {
                     View Details
                     <ChevronRight className="w-3 h-3" />
                   </span>
-                  <Download className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePrintPrescription(prescription);
+                    }}
+                    className="p-1 text-slate-300 hover:text-emerald-600 transition-colors"
+                    title="Print / Download PDF"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -236,6 +245,116 @@ export default function Prescriptions() {
     </div>
   );
 }
+
+const handlePrintPrescription = (p: Prescription) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Prescription - ${p.patientName}</title>
+        <style>
+          @page { size: A4; margin: 15mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; padding: 24px; line-height: 1.5; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
+          .logo { font-size: 24px; font-weight: 800; color: #059669; }
+          .clinic-info { font-size: 12px; color: #64748b; text-align: right; }
+          .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 20px; }
+          .meta-item { font-size: 13px; }
+          .meta-label { font-weight: 700; color: #475569; text-transform: uppercase; font-size: 11px; margin-bottom: 4px; }
+          .rx-symbol { font-size: 32px; font-weight: 900; color: #059669; margin-bottom: 12px; font-family: serif; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+          th { background: #f1f5f9; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+          td { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+          .instructions { font-style: italic; color: #475569; }
+          .notes-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 6px; margin-bottom: 24px; font-size: 13px; }
+          .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+          .stamp { text-align: center; border: 2px dashed #059669; padding: 8px 16px; border-radius: 8px; color: #059669; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+          .signature { text-align: right; }
+          .signature-line { width: 180px; border-top: 1px solid #0f172a; margin-top: 36px; margin-bottom: 6px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo">🌿 Raihan TeleMed</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Digital Clinical Consultation & Care</div>
+          </div>
+          <div class="clinic-info">
+            <strong>Raihan Virtual Health Center</strong><br/>
+            Ref: RX-${p.id ? p.id.slice(0, 8).toUpperCase() : 'PENDING'}<br/>
+            Date: ${p.date || new Date().toLocaleDateString()}
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div>
+            <div class="meta-label">Patient Information</div>
+            <div class="meta-item"><strong>${p.patientName}</strong></div>
+            <div class="meta-item">${p.patientEmail}</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="meta-label">Prescribing Physician</div>
+            <div class="meta-item"><strong>Dr. ${p.doctorName}</strong></div>
+            <div class="meta-item">${p.doctorEmail}</div>
+          </div>
+        </div>
+
+        <div class="rx-symbol">℞</div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Medication</th>
+              <th>Dosage</th>
+              <th>Frequency</th>
+              <th>Duration</th>
+              <th>Instructions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(p.medications || []).map(m => `
+              <tr>
+                <td><strong>${m.name}</strong></td>
+                <td>${m.dosage}</td>
+                <td>${m.frequency}</td>
+                <td>${m.duration}</td>
+                <td class="instructions">${m.instructions || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        ${p.notes ? `
+          <div class="notes-box">
+            <strong>Physician Clinical Notes:</strong><br/>
+            ${p.notes}
+          </div>
+        ` : ''}
+
+        <div class="footer">
+          <div class="stamp">
+            ✔ Digitally Verified Prescription<br/>
+            <span style="font-size: 9px; font-weight: normal; color: #64748b;">Raihan TeleMed System Verified</span>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <strong>Dr. ${p.doctorName}</strong><br/>
+            <span style="font-size: 11px; color: #64748b;">Licensed Medical Practitioner</span>
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
 
 function PrescriptionDetailModal({ prescription, onClose }: { prescription: Prescription, onClose: () => void }) {
   return (
@@ -368,7 +487,10 @@ function PrescriptionDetailModal({ prescription, onClose }: { prescription: Pres
         </div>
 
         <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
-          <button className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-200">
+          <button 
+            onClick={() => handlePrintPrescription(prescription)}
+            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-200"
+          >
             <Download className="w-5 h-5" />
             Download PDF
           </button>

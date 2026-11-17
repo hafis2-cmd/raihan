@@ -13,68 +13,71 @@ import {
   Heart, 
   Clock, 
   ChevronDown,
-  Info
+  Info,
+  Calendar,
+  FileText,
+  MessageSquare,
+  CreditCard
 } from 'lucide-react';
 
 interface FAQItem {
   question: string;
   answer: string;
-  category: 'diagnosis' | 'consultation' | 'general';
+  category: 'appointments' | 'prescriptions' | 'messages' | 'billing';
 }
 
 const FAQ_DATABASE: FAQItem[] = [
-  // Diagnosis Page Tailored FAQs
+  // Appointments
   {
-    category: 'diagnosis',
-    question: "How accurate are the AI diagnostic assessments?",
-    answer: "Our preliminary engines utilize advanced clinical algorithms trained on extensive medical literature matches & clinical dataset records. While these models consistently achieve high pre-validation accuracy, predictions are strictly supportive. They act as automated informative helpers and must always be correlated with formal, in-person clinical workups."
+    category: 'appointments',
+    question: "How do I book an appointment with a doctor?",
+    answer: "Go to the Appointments page, select an available physician, choose your preferred date and time slot on the calendar, and confirm your booking. The appointment will instantly appear on your dashboard schedule."
   },
   {
-    category: 'diagnosis',
-    question: "Where do the generated clinical recommendations come from?",
-    answer: "Recommendations are dynamically cross-referenced against authoritative global clinical guidelines (including evidence-based care standards). They outline conservative primary steps such as basic home vitals tracking, metabolic lab panels, or recommended specialist referrals appropriate for your symptom profiling."
+    category: 'appointments',
+    question: "Can I sync my appointment to Google Calendar?",
+    answer: "Yes! Each confirmed appointment card features a 'Sync' button that exports the session details, doctor information, and clinical location directly to your Google Calendar."
   },
   {
-    category: 'diagnosis',
-    question: "Who can see my assessment findings once analyzed?",
-    answer: "Your health records are safeguarded by robust security permissions. By default, records are private to your patient portal. They are visible only to you, to doctors you book appointments with directly on this platform, or to recipients of your safe, temporary 'Share Findings' HIPAA links."
-  },
-  {
-    category: 'diagnosis',
-    question: "What should I do if my predictive confidence score is low?",
-    answer: "Lower scores suggest sympomatic overlaps, multi-causative possibilities, or a need for deeper physical diagnostics. We heavily emphasize scheduling a professional face-to-face evaluation or diagnostic laboratory investigation rather than drawing clinical conclusions."
-  },
-  {
-    category: 'diagnosis',
-    question: "Can I copy, download, or share my findings?",
-    answer: "Yes. Use 'Download Report' to generate a stylized formal PDF assessment document, or select 'Share Findings' to obtain a secure time-limited access URL to safely forward to any private care practitioner."
+    category: 'appointments',
+    question: "How do I reschedule or cancel an appointment?",
+    answer: "Under the Appointments page, locate your appointment and click 'Cancel' to release the slot or choose a new time slot from the doctor's available calendar."
   },
 
-  // Consultation Page Tailored FAQs
+  // Prescriptions
   {
-    category: 'consultation',
-    question: "How do I launch a live telehealth video call?",
-    answer: "Navigate to the active listing within your Consultation dashboard. Ensure high-bandwidth internet connectivity, choose your doctor, and click 'Join Consultation Room' to initiate a compliant WebRTC media stream."
+    category: 'prescriptions',
+    question: "How do I print or download my digital prescription?",
+    answer: "Navigate to the Prescriptions tab, select any prescription record, and click 'Download PDF'. This generates an official Raihan TeleMed printable prescription complete with medication dosages, instructions, and physician verification stamps."
   },
   {
-    category: 'consultation',
-    question: "Are live telehealth media streams private and secure?",
-    answer: "Absolutely. All peer-to-peer data, audio, and high-definition video feeds are continuously encrypted utilizing DTLS & SRTP protocol layers. No streaming video content is stored, ensuring absolute HiPAA-aligned patient privacy compliance."
+    category: 'prescriptions',
+    question: "Can doctors issue digital prescriptions directly on the platform?",
+    answer: "Yes, licensed physicians can issue structured digital prescriptions with itemized medications, dosage schedules, duration, and clinical notes directly from the patient record or prescription portal."
+  },
+
+  // Messages
+  {
+    category: 'messages',
+    question: "Is patient-doctor messaging private and secure?",
+    answer: "Yes. All direct messages between patients and doctors are protected by encrypted database rules. You can safely discuss symptoms, follow-ups, and treatment progress in real-time."
   },
   {
-    category: 'consultation',
-    question: "How do I grant my doctor permission to view my pre-assessments?",
-    answer: "Registered physicians on our platform can automatically review diagnostic pre-assessment history linked to your secure email during your scheduled appointment window for integrated diagnostic support."
+    category: 'messages',
+    question: "Can I send medical files or photos in the chat?",
+    answer: "Yes! The chat window supports attaching images and medical files so your doctor can review prior test reports, lab results, or photo updates during your care."
+  },
+
+  // Billing & Payments
+  {
+    category: 'billing',
+    question: "How do I pay consultation fees?",
+    answer: "When a consultation is scheduled, an invoice appears in your Payments page. Click 'Pay Now' to complete your payment securely via digital cards or transfer."
   },
   {
-    category: 'consultation',
-    question: "Troubleshooting: What if my camera or microphone fails?",
-    answer: "First, verify that your browser has permissions allowed in the URL address bar lock icon. Also ensure no other active software (such as Zoom or Teams) is locking camera hardware. Refresh the call workspace to establish a fresh WebRTC hardware check."
-  },
-  {
-    category: 'consultation',
-    question: "Can I receive real-time updates and treatment plans during a call?",
-    answer: "Yes. Your physician can issue digital prescription charts, log consultation reports, and schedule follow-ups entirely inside our clinical dashboard. These populate on your main Patient dashboard instantly."
+    category: 'billing',
+    question: "Where do I get payment receipts for insurance claims?",
+    answer: "Every completed transaction in the Payments tab has a 'Download PDF Receipt' icon. Click it to print or save a formal invoice receipt with itemized charges and clinic verification."
   }
 ];
 
@@ -82,27 +85,14 @@ export default function FloatingFAQ() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'diagnosis' | 'consultation'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'appointments' | 'prescriptions' | 'messages' | 'billing'>('all');
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
-  const isDiagnosisPage = location.pathname.includes('/diagnosis');
-  const isConsultationPage = location.pathname.includes('/consultation');
-
-  // If we are not on either of the relevant pages, don't show the help button
-  if (!isDiagnosisPage && !isConsultationPage) {
-    return null;
-  }
-
-  // Set the default tab based on the active page
-  const pageCategory = isDiagnosisPage ? 'diagnosis' : 'consultation';
-  const displayTab = activeTab === 'all' ? 'all' : activeTab;
-
+  // Filter FAQs based on tab and query
   const filteredFAQs = FAQ_DATABASE.filter(faq => {
-    // Category filter logic
     if (activeTab !== 'all' && faq.category !== activeTab) {
       return false;
     }
-    // Search filter logic
     if (searchQuery.trim() !== '') {
       const criteria = searchQuery.toLowerCase();
       return (
@@ -122,10 +112,7 @@ export default function FloatingFAQ() {
       {/* Floating Action Help Trigger */}
       <div className="fixed bottom-6 right-6 z-40">
         <motion.button
-          onClick={() => {
-            setIsOpen(true);
-            setActiveTab(pageCategory); // Automatically adapt the active category
-          }}
+          onClick={() => setIsOpen(true)}
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.95 }}
           className="flex items-center gap-2 bg-slate-900 dark:bg-emerald-600 text-white font-extrabold text-xs tracking-wider uppercase pl-3.5 pr-4.5 py-3 rounded-full shadow-2xl hover:bg-slate-800 dark:hover:bg-emerald-700 transition-all border border-slate-800 dark:border-emerald-500/30 group cursor-pointer"
@@ -157,8 +144,8 @@ export default function FloatingFAQ() {
                       <HelpCircle className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Diagnostics & Consultation FAQ</h3>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Immediate Clinical Assessment Assistance</p>
+                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Raihan TeleMed Help Center</h3>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Patient & Doctor Portal Guide</p>
                     </div>
                   </div>
                   <button
@@ -172,12 +159,12 @@ export default function FloatingFAQ() {
                 {/* Sub-disclaimer info banner */}
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 p-3 rounded-2xl flex items-start gap-2 text-[10px] text-emerald-850 dark:text-emerald-400 font-semibold leading-relaxed">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Your interactions other than telehealth streams remain securely logged and synced to custom HIPAA rules. Seek human advice for clinical emergencies.</span>
+                  <span>All your consultations, medical prescriptions, and private messages are encrypted and HIPAA-aligned.</span>
                 </div>
 
                 {/* Categories filtering tabs */}
-                <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
-                  {(['all', 'diagnosis', 'consultation'] as const).map((cat) => (
+                <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl overflow-x-auto">
+                  {(['all', 'appointments', 'prescriptions', 'messages', 'billing'] as const).map((cat) => (
                     <button
                       key={cat}
                       type="button"
@@ -185,7 +172,7 @@ export default function FloatingFAQ() {
                         setActiveTab(cat);
                         setExpandedIndex(null);
                       }}
-                      className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                      className={`flex-1 text-[9px] font-black uppercase tracking-wider py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center shrink-0 ${
                         activeTab === cat 
                           ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
                           : "text-slate-400 hover:text-slate-650"
@@ -203,7 +190,7 @@ export default function FloatingFAQ() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search clinical topics, accuracy support..."
+                    placeholder="Search appointments, prescriptions, billing..."
                     className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-205 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
                   />
                 </div>
@@ -226,15 +213,28 @@ export default function FloatingFAQ() {
                         >
                           <div className="space-y-1">
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white dark:bg-slate-800 text-slate-500 border border-slate-100 dark:border-slate-755 shadow-xs">
-                              {faq.category === 'diagnosis' ? (
+                              {faq.category === 'appointments' && (
                                 <>
-                                  <Activity className="w-2.5 h-2.5 text-emerald-500 animate-pulse" />
-                                  Diagnostic AI
+                                  <Calendar className="w-2.5 h-2.5 text-blue-500" />
+                                  Appointments
                                 </>
-                              ) : (
+                              )}
+                              {faq.category === 'prescriptions' && (
                                 <>
-                                  <Video className="w-2.5 h-2.5 text-blue-500" />
-                                  Consultations
+                                  <FileText className="w-2.5 h-2.5 text-emerald-500" />
+                                  Prescriptions
+                                </>
+                              )}
+                              {faq.category === 'messages' && (
+                                <>
+                                  <MessageSquare className="w-2.5 h-2.5 text-indigo-500" />
+                                  Messages
+                                </>
+                              )}
+                              {faq.category === 'billing' && (
+                                <>
+                                  <CreditCard className="w-2.5 h-2.5 text-amber-500" />
+                                  Payments
                                 </>
                               )}
                             </span>

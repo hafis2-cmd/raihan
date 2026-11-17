@@ -262,7 +262,7 @@ export default function Dashboard() {
           <p className="text-emerald-50/80 leading-relaxed">
             {profile?.role === 'Doctor' 
               ? "Manage your appointments, view patient records, and provide expert medical consultations through our secure platform."
-              : "Your health is our priority. Use our AI-powered tools to diagnose symptoms, find nearby pharmacies, or book a consultation with top specialists."}
+              : "Your health is our priority. Schedule appointments with top doctors, manage digital prescriptions, message your physician, and track your medical records seamlessly."}
           </p>
           <div className="flex gap-3 pt-2">
             {profile?.role === 'Doctor' ? (

@@ -14,7 +14,8 @@ import {
   User,
   History,
   X,
-  FileText
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
@@ -121,11 +122,11 @@ export default function CallHistory() {
         
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate('/consultation')}
+            onClick={() => navigate('/appointments')}
             className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-100 flex items-center gap-2"
           >
-            <Video className="w-4 h-4" />
-            New Consultation
+            <Calendar className="w-4 h-4" />
+            Book Appointment
           </button>
         </div>
       </div>
@@ -239,23 +240,27 @@ export default function CallHistory() {
 
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => navigate('/consultation', { state: { targetEmail: otherEmail, targetName: otherName }})}
+                          onClick={() => navigate('/messages', { state: { targetEmail: otherEmail, targetName: otherName }})}
                           className="p-3 bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all"
-                          title="Call back"
+                          title="Message"
                         >
-                          <Video className="w-5 h-5" />
+                          <MessageSquare className="w-5 h-5" />
                         </button>
                         {isDoctorRole && (
                           <button 
-                            onClick={() => navigate('/prescriptions')}
-                            className="p-3 bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all"
+                            onClick={() => navigate('/prescriptions', { state: { patientEmail: otherEmail, patientName: otherName }})}
+                            className="p-3 bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all"
                             title="Write Prescription"
                           >
                             <FileText className="w-5 h-5" />
                           </button>
                         )}
-                        <button className="p-3 bg-slate-50 text-slate-400 hover:bg-slate-100 rounded-xl transition-all">
-                          <MoreVertical className="w-5 h-5" />
+                        <button 
+                          onClick={() => navigate('/appointments', { state: { targetEmail: otherEmail, targetName: otherName }})}
+                          className="p-3 bg-slate-50 text-slate-400 hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-all"
+                          title="Schedule Follow-Up"
+                        >
+                          <Calendar className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
@@ -272,14 +277,14 @@ export default function CallHistory() {
             <div className="space-y-2">
               <h3 className="text-2xl font-black text-slate-800 tracking-tight">No Call History</h3>
               <p className="text-slate-400 font-medium max-w-sm mx-auto">
-                Consultations you've completed or missed will appear here. Start your first consultation today.
+                Consultations and calls will appear here. Schedule your next appointment today.
               </p>
             </div>
             <button 
-              onClick={() => navigate('/doctors')}
+              onClick={() => navigate('/appointments')}
               className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 mx-auto shadow-xl shadow-slate-200"
             >
-              Find a Doctor
+              Book an Appointment
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

@@ -56,7 +56,7 @@ export default function CallNotification() {
 
   const handleAccept = () => {
     if (incomingCall) {
-      navigate('/consultation', { state: { incomingCallId: incomingCall.id, autoAccept: true } });
+      navigate('/messages', { state: { targetEmail: incomingCall.callerEmail, targetName: incomingCall.callerName } });
       setIncomingCall(null);
     }
   };

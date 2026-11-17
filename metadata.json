@@ -1,6 +1,6 @@
 {
-  "name": "TeleMed AI: Advanced Diagnosis & Care",
-  "description": "A comprehensive telemedicine platform featuring AI-powered diagnostics, real-time pharmacy mapping, and patient management.",
+  "name": "Raihan TeleMed: Digital Healthcare & Clinical Consultation",
+  "description": "A comprehensive digital healthcare platform featuring scheduled appointments, electronic prescriptions, direct doctor-patient messaging, and patient records.",
   "requestFramePermissions": [
     "camera",
     "microphone",

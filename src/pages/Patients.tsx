@@ -550,16 +550,16 @@ export default function Patients() {
                   </button>
 
                   <button
-                    id={`call-patient-${patient.email.replace(/[@.]/g, '-')}`}
-                    title="Start Call"
+                    id={`message-patient-${patient.email.replace(/[@.]/g, '-')}`}
+                    title="Send Message"
                     onClick={(e) => { 
                       e.stopPropagation(); 
-                      navigate('/consultation', { state: { targetEmail: patient.email, targetName: patient.name } }); 
+                      navigate('/messages', { state: { targetEmail: patient.email, targetName: patient.name } }); 
                     }}
-                    className="flex-1 py-1.5 px-0.5 hover:bg-blue-600 hover:text-white text-slate-300 hover:shadow-lg rounded-xl transition-all duration-200 flex flex-col sm:flex-row items-center justify-center gap-1 text-[9px] font-bold bg-slate-800 border border-slate-700/50"
+                    className="flex-1 py-1.5 px-0.5 hover:bg-emerald-600 hover:text-white text-slate-300 hover:shadow-lg rounded-xl transition-all duration-200 flex flex-col sm:flex-row items-center justify-center gap-1 text-[9px] font-bold bg-slate-800 border border-slate-700/50"
                   >
-                    <Video className="w-3.5 h-3.5 shrink-0" />
-                    <span>Call</span>
+                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                    <span>Message</span>
                   </button>
 
                   <button
@@ -576,16 +576,16 @@ export default function Patients() {
                   </button>
 
                   <button
-                    id={`triage-patient-${patient.email.replace(/[@.]/g, '-')}`}
-                    title="Quick-Start Triage"
+                    id={`prescribe-patient-${patient.email.replace(/[@.]/g, '-')}`}
+                    title="Write Prescription"
                     onClick={(e) => { 
                       e.stopPropagation(); 
-                      navigate('/diagnosis', { state: { patientEmail: patient.email, patientName: patient.name } }); 
+                      navigate('/prescriptions', { state: { patientEmail: patient.email, patientName: patient.name } }); 
                     }}
-                    className="flex-1 py-1.5 px-0.5 hover:bg-violet-600 hover:text-white text-slate-300 hover:shadow-lg rounded-xl transition-all duration-200 flex flex-col sm:flex-row items-center justify-center gap-1 text-[9px] font-bold bg-slate-800 border border-slate-700/50"
+                    className="flex-1 py-1.5 px-0.5 hover:bg-blue-600 hover:text-white text-slate-300 hover:shadow-lg rounded-xl transition-all duration-200 flex flex-col sm:flex-row items-center justify-center gap-1 text-[9px] font-bold bg-slate-800 border border-slate-700/50"
                   >
-                    <Activity className="w-3.5 h-3.5 shrink-0" />
-                    <span>Triage</span>
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span>Prescribe</span>
                   </button>
 
                   <button
@@ -784,11 +784,11 @@ function PatientDetailModal({ patient, history, loading, onClose, navigate, onDe
             Message Patient
           </button>
           <button 
-            onClick={() => navigate('/consultation', { state: { targetEmail: patient.email, targetName: patient.name } })}
+            onClick={() => navigate('/appointments', { state: { patientEmail: patient.email, patientName: patient.name } })}
             className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-100"
           >
-            <Video className="w-5 h-5" />
-            Start Video Call
+            <Calendar className="w-5 h-5" />
+            Book Appointment
           </button>
           <button 
             onClick={onClose}
