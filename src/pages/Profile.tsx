@@ -44,18 +44,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const DENTAL_SPECIALTIES = [
-  'General Dentistry',
-  'Endodontics (Root Canal Specialist)',
-  'Orthodontics (Braces & Aligners)',
-  'Periodontics (Gum Disease & Implants)',
-  'Prosthodontics (Crowns & Bridges)',
-  'Oral & Maxillofacial Surgery',
-  'Pediatric Dentistry (Pedodontics)',
-  'Cosmetic Dentistry & Whitening',
-  'Oral Pathology & Radiology'
-];
-
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export default function Profile() {
@@ -360,16 +348,12 @@ export default function Profile() {
 
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
-                  <span className="text-emerald-100">Specialty</span>
-                  <span className="font-bold text-right">{formData.specialty || 'General Dentistry'}</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-white/10">
-                  <span className="text-emerald-100">Sub-Specialty</span>
-                  <span className="font-bold text-right">{formData.subSpecialty || 'Endodontics & Crowns'}</span>
+                  <span className="text-emerald-100">Qualification</span>
+                  <span className="font-bold text-right">{formData.education || 'BDS, MDS'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-emerald-100">Experience</span>
-                  <span className="font-bold text-right">{formData.experience ? `${formData.experience} Years` : '10+ Years'}</span>
+                  <span className="font-bold text-right">{formData.experience ? `${formData.experience} Years` : '5+ Years'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-emerald-100">Dental Reg No.</span>
@@ -468,40 +452,13 @@ export default function Profile() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Primary Dental Specialty</label>
-                      <select
-                        value={formData.specialty}
-                        onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                        disabled={!isEditing}
-                        className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Select Specialty</option>
-                        {DENTAL_SPECIALTIES.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Sub-Specialty / Clinical Focus</label>
-                      <input
-                        type="text"
-                        value={formData.subSpecialty}
-                        onChange={(e) => setFormData({ ...formData, subSpecialty: e.target.value })}
-                        disabled={!isEditing}
-                        placeholder="e.g. Microscopic Endodontics & Smile Aesthetics"
-                        className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Qualifications & Degrees</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Qualifications & Professional Degrees</label>
                       <input
                         type="text"
                         value={formData.education}
                         onChange={(e) => setFormData({ ...formData, education: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. BDS, MDS (Conservative Dentistry & Endodontics)"
+                        placeholder="e.g. BDS, MDS"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -515,7 +472,7 @@ export default function Profile() {
                         value={formData.experience}
                         onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. 12"
+                        placeholder="e.g. 10"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>

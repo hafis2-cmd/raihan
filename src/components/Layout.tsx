@@ -30,7 +30,6 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import CallNotification from './CallNotification';
 import { getLocalNotifications, markAllNotificationsRead, SystemNotification } from '../services/appointmentService';
 
 function cn(...inputs: ClassValue[]) {
@@ -48,7 +47,6 @@ const getNavItems = (role: string, subscribed: boolean) => {
     { icon: FileText, label: 'Prescriptions', path: '/prescriptions' },
     { icon: CreditCard, label: 'Payments', path: '/payments' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
-    { icon: History, label: 'Call History', path: '/call-history' },
   ];
 
   if (isDentistRole || role === 'Admin') {
@@ -126,8 +124,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] dark:bg-slate-950 flex text-slate-900 dark:text-slate-100 transition-colors duration-200">
-      <CallNotification />
-
       {/* Mobile Drawer Overlay Back-drop */}
       {isSidebarOpen && (
         <div 

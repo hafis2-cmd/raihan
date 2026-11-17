@@ -17,7 +17,6 @@ import {
   ChevronLeft,
   LayoutList,
   CalendarDays,
-  Video,
   Bell,
   CalendarPlus,
   Check,
@@ -87,16 +86,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const SPECIALTY_FILTERS = [
-  'All',
-  'General Dentistry',
-  'Endodontics (Root Canal Specialist)',
-  'Orthodontics (Braces & Aligners)',
-  'Periodontics (Gum Care)',
-  'Pediatric Dentistry',
-  'Oral & Maxillofacial Surgery'
-];
-
 export default function Appointments() {
   const { profile, user, googleToken, connectGoogleCalendar } = useAuth();
   const navigate = useNavigate();
@@ -115,7 +104,6 @@ export default function Appointments() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSpecialty, setSelectedSpecialty] = useState('All');
 
   // Doctor Tab States
   // 'requests' | 'upcoming' | 'availability' | 'history'
@@ -125,12 +113,11 @@ export default function Appointments() {
   // 'book' | 'pending' | 'confirmed' | 'rejected' | 'history'
   const [patientActiveTab, setPatientActiveTab] = useState<'book' | 'pending' | 'confirmed' | 'rejected' | 'history'>('book');
 
-  // Patient Booking Modal States
+  // Patient Booking Modal States (Strictly On-Site Clinic Consultation)
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingDoctor, setBookingDoctor] = useState<any>(null);
   const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [bookingTime, setBookingTime] = useState<string>('');
-  const [bookingType, setBookingType] = useState<ConsultationType>('video');
   const [bookingReason, setBookingReason] = useState<string>('');
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingFeedbackMessage, setBookingFeedbackMessage] = useState<string | null>(null);
@@ -147,9 +134,8 @@ export default function Appointments() {
   const [availError, setAvailError] = useState<string>('');
   const [availSuccess, setAvailSuccess] = useState<string>('');
 
-  // Google Calendar & Meet States
+  // Google Calendar States
   const [syncingApptId, setSyncingApptId] = useState<string | null>(null);
-  const [creatingMeetId, setCreatingMeetId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{ [key: string]: { status: 'success' | 'error', message?: string } }>({});
 
   // 1. Initial Load and Event Listeners
@@ -249,7 +235,6 @@ export default function Appointments() {
     setBookingDoctor(docItem);
     setBookingDate(new Date().toISOString().split('T')[0]);
     setBookingTime('');
-    setBookingType('video');
     setBookingReason('');
     setBookingFeedbackMessage(null);
     setShowBookingModal(true);
@@ -260,7 +245,7 @@ export default function Appointments() {
     if (!profile?.email || !bookingDoctor || !bookingDate || !bookingTime) return;
 
     if (!bookingReason.trim()) {
-      alert("Please provide a reason or symptom summary for your consultation.");
+      alert("Please select or describe your dental concern.");
       return;
     }
 
@@ -275,12 +260,12 @@ export default function Appointments() {
         patientBloodGroup: profile.bloodGroup,
         doctorEmail: bookingDoctor.email,
         doctorName: bookingDoctor.name,
-        doctorSpecialty: bookingDoctor.specialty,
+        doctorSpecialty: 'Dental Surgeon',
         doctorImage: bookingDoctor.image,
-        location: bookingDoctor.location || 'Raihan Telemedicine Clinic',
+        location: bookingDoctor.location || 'Raihan Dental Clinic',
         date: bookingDate,
         time: bookingTime,
-        consultationType: bookingType,
+        consultationType: 'on_site',
         reason: bookingReason.trim()
       });
 
@@ -288,7 +273,7 @@ export default function Appointments() {
       setShowBookingModal(false);
       setPatientActiveTab('pending');
       setBookingFeedbackMessage(
-        "Your appointment request has been submitted. Please wait for the doctor's approval. You will receive a notification once the doctor responds."
+        "Your on-site dental appointment request has been submitted. Please wait for the dentist's approval. You will receive a notification once reviewed."
       );
       loadAllData();
     } catch (err) {
@@ -453,11 +438,12 @@ export default function Appointments() {
       const endDateTime = new Date(startDateTime.getTime() + (app.duration || 30) * 60 * 1000);
 
       const otherPerson = isDoctor ? app.patient_name : `Dr. ${app.doctor_name}`;
-      const summary = `Raihan Consultation: ${otherPerson}`;
-      const description = `Telemedicine Session (${app.consultation_type.toUpperCase()})\n` +
+      const summary = `Raihan Dental Clinic: ${otherPerson}`;
+      const description = `On-Site Dental Consultation\n` +
         `Patient: ${app.patient_name} (${app.patient_email})\n` +
-        `Doctor: Dr. ${app.doctor_name} (${app.doctor_specialty})\n` +
+        `Dentist: Dr. ${app.doctor_name}\n` +
         `Reason: ${app.reason}\n\n` +
+        `Location: ${app.location || 'Raihan Dental Clinic'}\n` +
         `Portal URL: ${window.location.origin}/appointments`;
 
       const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
@@ -494,43 +480,6 @@ export default function Appointments() {
     }
   };
 
-  const handleCreateGoogleMeet = async (app: Appointment) => {
-    let token = googleToken;
-    if (!token) {
-      const confirmAuth = window.confirm("Connect Google account to generate a Meet link?");
-      if (!confirmAuth) return;
-      token = await connectGoogleCalendar();
-      if (!token) return;
-    }
-
-    setCreatingMeetId(app.id);
-    try {
-      const res = await fetch('https://meet.googleapis.com/v2/spaces', {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({}),
-      });
-
-      const data = await res.json();
-      if (data.meetingUri) {
-        const all = getLocalAppointments();
-        const target = all.find(a => a.id === app.id);
-        if (target) {
-          target.google_meet_link = data.meetingUri;
-          saveLocalAppointments(all);
-          loadAllData();
-        }
-      }
-    } catch (e) {
-      console.warn("Meet creation fallback:", e);
-    } finally {
-      setCreatingMeetId(null);
-    }
-  };
-
   // ---------------- FILTERING LOGIC ----------------
 
   // Doctor Filtered Appointments
@@ -551,13 +500,12 @@ export default function Appointments() {
   const currentDoctorSlots = slots.filter(s => s.doctor_email === profile?.email);
   const slotsForSelectedAvailDate = currentDoctorSlots.filter(s => s.slot_date === availDate);
 
-  // Patient Doctors Directory Filter
+  // Patient Doctors Directory Filter (Search by dentist name or clinic location)
   const filteredDoctors = doctors.filter(docItem => {
-    const matchesSearch = (docItem.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (docItem.specialty || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (docItem.location || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSpecialty = selectedSpecialty === 'All' || docItem.specialty === selectedSpecialty;
-    return matchesSearch && matchesSpecialty;
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    return (docItem.name || '').toLowerCase().includes(query) ||
+           (docItem.location || '').toLowerCase().includes(query);
   });
 
   // Calendar Days Logic
@@ -797,8 +745,8 @@ export default function Appointments() {
                             <Clock className="w-3.5 h-3.5 text-emerald-600" />
                             <span>{appt.appointment_time} ({appt.duration || 30} mins)</span>
                           </div>
-                          <span className="inline-block mt-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            {appt.consultation_type === 'video' ? '🎥 Video Consult' : appt.consultation_type === 'in_person' ? '🏥 In-Person Visit' : '📞 Audio Tele-Consult'}
+                          <span className="inline-block mt-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            🏥 On-Site Consultation
                           </span>
                         </div>
                       </div>
@@ -893,7 +841,7 @@ export default function Appointments() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Consultation Type</span>
-                          <span className="font-bold text-emerald-700 uppercase">{appt.consultation_type.replace('_', ' ')}</span>
+                          <span className="font-bold text-emerald-700">🏥 On-Site Dental Consultation</span>
                         </div>
                         <div className="pt-1 text-[11px] text-slate-600 italic">
                           "{appt.reason}"
@@ -903,29 +851,9 @@ export default function Appointments() {
                       {/* Doctor Action Buttons */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                         <div className="flex items-center gap-2">
-                          {appt.google_meet_link ? (
-                            <a
-                              href={appt.google_meet_link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs"
-                            >
-                              <Video className="w-3 h-3" />
-                              <span>Join Meet</span>
-                            </a>
-                          ) : (
-                            <button
-                              onClick={() => handleCreateGoogleMeet(appt)}
-                              className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1"
-                            >
-                              <Video className="w-3 h-3" />
-                              <span>Meet Link</span>
-                            </button>
-                          )}
-
                           <button
                             onClick={() => handleSyncToGoogleCalendar(appt)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1"
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                           >
                             <CalendarPlus className="w-3 h-3 text-emerald-600" />
                             <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Cal'}</span>
@@ -1145,7 +1073,7 @@ export default function Appointments() {
                     <div key={app.id} className="p-4 sm:p-5 flex items-center justify-between text-xs">
                       <div className="space-y-1">
                         <p className="font-bold text-slate-800">{app.patient_name} ({app.patient_email})</p>
-                        <p className="text-slate-400">{app.appointment_date} at {app.appointment_time} • {app.consultation_type.toUpperCase()}</p>
+                        <p className="text-slate-400">{app.appointment_date} at {app.appointment_time} • On-Site Consultation</p>
                         {app.rejection_reason && (
                           <p className="text-rose-600 font-semibold italic text-[11px]">Rejection reason: {app.rejection_reason}</p>
                         )}
@@ -1261,34 +1189,17 @@ export default function Appointments() {
           {patientActiveTab === 'book' && (
             <div className="space-y-6">
               
-              {/* Search & Specialty Filter */}
+              {/* Search Dentists Directory */}
               <div className="space-y-3">
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search dentist by name, dental specialty, or clinic location..."
+                    placeholder="Search dentist by name or clinic location..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all shadow-xs"
                   />
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {SPECIALTY_FILTERS.map(spec => (
-                    <button
-                      key={spec}
-                      onClick={() => setSelectedSpecialty(spec)}
-                      className={cn(
-                        "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer",
-                        selectedSpecialty === spec 
-                          ? "bg-emerald-600 text-white shadow-xs" 
-                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      {spec}
-                    </button>
-                  ))}
                 </div>
               </div>
 
@@ -1303,7 +1214,7 @@ export default function Appointments() {
                     <p className="text-xs text-slate-500 max-w-sm mx-auto">
                       {searchQuery 
                         ? "No dentists match your search filter." 
-                        : "There are currently no registered dental specialists in the system. Registered dentists will appear here once registered."}
+                        : "There are currently no registered dentists in the system. Registered dentists will appear here once registered."}
                     </p>
                   </div>
                 </div>
@@ -1327,8 +1238,8 @@ export default function Appointments() {
                           </div>
                           <div>
                             <h4 className="font-black text-slate-800 text-base">{docItem.name}</h4>
-                            <p className="text-xs font-bold text-emerald-600">{docItem.specialty}</p>
-                            <p className="text-[11px] text-slate-400 font-medium">{docItem.education || 'Clinical Specialist'}</p>
+                            <p className="text-xs font-bold text-emerald-600">Dental Surgeon</p>
+                            <p className="text-[11px] text-slate-400 font-medium">{docItem.education || 'BDS, MDS'}</p>
                             <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
                               <Star className="w-3.5 h-3.5 fill-amber-400" />
                               <span>{docItem.rating || '5.0'}</span>
@@ -1415,8 +1326,8 @@ export default function Appointments() {
                       </div>
 
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400">
-                          {appt.consultation_type.toUpperCase().replace('_', ' ')}
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                          🏥 On-Site Clinic Consultation
                         </span>
                         <button
                           onClick={() => handlePatientCancelRequest(appt.id)}
@@ -1448,7 +1359,7 @@ export default function Appointments() {
                   <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto" />
                   <h4 className="font-bold text-slate-800 text-base">No Confirmed Visits Yet</h4>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Once a doctor approves your requested appointment, it will appear here with Google Calendar and video link options.
+                    Once the dentist approves your requested appointment, it will appear here with your confirmed clinic consultation schedule.
                   </p>
                 </div>
               ) : (
@@ -1462,7 +1373,7 @@ export default function Appointments() {
                           </div>
                           <div>
                             <h4 className="font-bold text-slate-800 text-sm">Dr. {appt.doctor_name}</h4>
-                            <p className="text-xs font-bold text-emerald-600">{appt.doctor_specialty}</p>
+                            <p className="text-xs font-bold text-emerald-600">Dental Surgeon</p>
                           </div>
                         </div>
                         <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -1477,31 +1388,19 @@ export default function Appointments() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Location</span>
-                          <span className="font-bold text-slate-700">{appt.location}</span>
+                          <span className="font-bold text-slate-700">{appt.location || 'Raihan Dental Clinic'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Type</span>
-                          <span className="font-bold text-emerald-700 uppercase">{appt.consultation_type.replace('_', ' ')}</span>
+                          <span className="font-bold text-emerald-700">🏥 On-Site Dental Consultation</span>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                         <div className="flex items-center gap-2">
-                          {appt.google_meet_link && (
-                            <a
-                              href={appt.google_meet_link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs"
-                            >
-                              <Video className="w-3 h-3" />
-                              <span>Join Meet</span>
-                            </a>
-                          )}
-
                           <button
                             onClick={() => handleSyncToGoogleCalendar(appt)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1"
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                           >
                             <CalendarPlus className="w-3 h-3 text-emerald-600" />
                             <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Cal'}</span>
@@ -1737,14 +1636,14 @@ export default function Appointments() {
                     <CalendarPlus className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-800">Request Appointment</h3>
-                    <p className="text-xs text-slate-500 font-medium">With {bookingDoctor.name} ({bookingDoctor.specialty})</p>
+                    <h3 className="text-xl font-black text-slate-800">Request Dental Appointment</h3>
+                    <p className="text-xs text-slate-500 font-medium">Dr. {bookingDoctor.name} • On-Site Clinic Consultation</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowBookingModal(false)}
-                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
+                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -1752,123 +1651,113 @@ export default function Appointments() {
 
               <form onSubmit={handlePatientSubmitRequest} className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                 
-                {/* Step 1: Select Consultation Type */}
+                {/* Section 1: Select Appointment Date */}
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                    1. Select Consultation Mode
+                  <label className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-emerald-600" />
+                    <span>Section 1: Select Appointment Date</span>
                   </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { id: 'video', label: 'Video Consult', icon: Video, desc: 'HD Telehealth' },
-                      { id: 'in_person', label: 'In-Person', icon: Building, desc: 'Clinic Visit' },
-                      { id: 'audio', label: 'Audio Call', icon: Phone, desc: 'Voice Tele-Care' },
-                    ].map(type => (
-                      <button
-                        key={type.id}
-                        type="button"
-                        onClick={() => setBookingType(type.id as ConsultationType)}
-                        className={cn(
-                          "p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5",
-                          bookingType === type.id
-                            ? "border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm"
-                            : "border-slate-200 hover:border-slate-300 text-slate-600"
-                        )}
-                      >
-                        <type.icon className={cn("w-5 h-5", bookingType === type.id ? "text-emerald-600" : "text-slate-400")} />
-                        <span className="text-xs font-bold block">{type.label}</span>
-                        <span className="text-[10px] text-slate-400 block">{type.desc}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Step 2: Choose Date & Available Slot */}
-                <div className="space-y-3">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                    2. Select Preferred Date & Available Time Slot
-                  </label>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <span className="text-[11px] font-bold text-slate-500">Date</span>
                       <input
                         type="date"
                         min={new Date().toISOString().split('T')[0]}
                         value={bookingDate}
-                        onChange={(e) => setBookingDate(e.target.value)}
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                        onChange={(e) => {
+                          setBookingDate(e.target.value);
+                          setBookingTime('');
+                        }}
+                        className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-bold text-slate-500">Clinical Location</span>
-                      <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-700 font-medium truncate border border-slate-200">
-                        {bookingDoctor.location}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Slot Pills */}
-                  <div className="space-y-2 pt-1">
-                    <span className="text-[11px] font-bold text-slate-500 block">Available Slots for {bookingDate}:</span>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {(bookingDoctorSlots.length > 0 
-                        ? bookingDoctorSlots 
-                        : [
-                            { id: 'def-1', slot_time: '09:00 AM', is_available: true },
-                            { id: 'def-2', slot_time: '10:30 AM', is_available: true },
-                            { id: 'def-3', slot_time: '02:00 PM', is_available: true },
-                            { id: 'def-4', slot_time: '03:30 PM', is_available: true }
-                          ]
-                      ).map((slot: any) => {
-                        const isReserved = !slot.is_available;
-                        const isSelected = bookingTime === slot.slot_time;
-
-                        return (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            disabled={isReserved}
-                            onClick={() => setBookingTime(slot.slot_time)}
-                            className={cn(
-                              "p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center cursor-pointer",
-                              isSelected 
-                                ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200" 
-                                : isReserved 
-                                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60" 
-                                  : "bg-white border-slate-200 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50"
-                            )}
-                          >
-                            <span>{slot.slot_time}</span>
-                            {isReserved && <span className="text-[8px] text-rose-500 font-black uppercase">Booked</span>}
-                          </button>
-                        );
-                      })}
+                    <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-700 font-medium border border-slate-200 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="truncate">{bookingDoctor.location || 'Raihan Dental Clinic'} (On-Site)</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Step 3: Reason for Consultation */}
+                {/* Section 2: Select Available Time Slot */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-emerald-600" />
+                      <span>Section 2: Select Available Time Slot</span>
+                    </label>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {bookingDoctorSlots.filter((s: any) => s.is_available).length > 0 
+                        ? `${bookingDoctorSlots.filter((s: any) => s.is_available).length} slots configured` 
+                        : 'Standard clinic hours available'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {(bookingDoctorSlots.length > 0 
+                      ? bookingDoctorSlots 
+                      : [
+                          { id: 'def-1', slot_time: '09:00 AM', is_available: true },
+                          { id: 'def-2', slot_time: '10:00 AM', is_available: true },
+                          { id: 'def-3', slot_time: '11:30 AM', is_available: true },
+                          { id: 'def-4', slot_time: '02:00 PM', is_available: true },
+                          { id: 'def-5', slot_time: '03:30 PM', is_available: true },
+                          { id: 'def-6', slot_time: '04:30 PM', is_available: true }
+                        ]
+                    ).map((slot: any) => {
+                      const isReserved = !slot.is_available;
+                      const isSelected = bookingTime === slot.slot_time;
+
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={isReserved}
+                          onClick={() => setBookingTime(slot.slot_time)}
+                          className={cn(
+                            "p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center cursor-pointer",
+                            isSelected 
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200" 
+                              : isReserved 
+                                ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60" 
+                                : "bg-white border-slate-200 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50"
+                          )}
+                        >
+                          <span>{slot.slot_time}</span>
+                          {isReserved && <span className="text-[8px] text-rose-500 font-black uppercase">Reserved</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 3: Reason for Dental Visit & Symptoms */}
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                    3. Reason for Dental Visit & Symptoms <span className="text-rose-500">*</span>
+                  <label className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <span>Section 3: Reason for Dental Visit & Symptoms</span>
+                    <span className="text-rose-500">*</span>
                   </label>
                   
                   {/* Quick Dental Concern Chips */}
                   <div className="flex flex-wrap gap-1.5 pb-1">
                     {[
-                      'Toothache & cold sensitivity',
+                      'Toothache and cold sensitivity',
                       'Routine dental cleaning (Scaling)',
                       'Broken filling or chipped tooth',
-                      'Bleeding/swollen gums',
+                      'Bleeding or swollen gums',
                       'Root canal pain evaluation',
-                      'Wisdom tooth swelling'
+                      'Wisdom tooth discomfort',
+                      'Other dental concerns'
                     ].map(chip => (
                       <button
                         key={chip}
                         type="button"
                         onClick={() => setBookingReason(chip)}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer border",
+                          bookingReason === chip 
+                            ? "bg-emerald-600 text-white border-emerald-600" 
+                            : "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent"
+                        )}
                       >
                         + {chip}
                       </button>
@@ -1880,24 +1769,51 @@ export default function Appointments() {
                     required
                     value={bookingReason}
                     onChange={(e) => setBookingReason(e.target.value)}
-                    placeholder="Describe your dental concern, tooth number if known, pain severity, or procedure requested..."
-                    className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all resize-none"
+                    placeholder="Describe your dental concern, symptoms, tooth location, or specific treatment requested..."
+                    className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all resize-none font-medium"
                   />
                 </div>
 
-                {/* Important Notice */}
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Dentist Controlled Approval</span>
-                  </p>
-                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                    Submitting this request does not confirm the appointment. {bookingDoctor.name} will independently accept or decline your request based on clinic chair availability. You will receive an immediate notification once reviewed.
-                  </p>
+                {/* Section 4: Appointment Request Review & Summary */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-3">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                    Section 4: Appointment Request Summary
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Selected Dentist</span>
+                      <span className="font-bold text-slate-800">Dr. {bookingDoctor.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Consultation Mode</span>
+                      <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] inline-block border border-emerald-200">
+                        🏥 On-Site Clinic Consultation
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Date & Time</span>
+                      <span className="font-bold text-slate-800">
+                        {bookingDate} • {bookingTime || '(Please select a slot)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Dental Concern</span>
+                      <span className="font-bold text-slate-800 truncate block">
+                        {bookingReason || '(Select or enter concern)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 text-[11px] text-amber-800 flex items-start gap-1.5 font-medium">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      Submitting this request creates a <strong>PENDING</strong> appointment. Dr. {bookingDoctor.name} will independently review and accept or decline your request based on clinic chair availability.
+                    </span>
+                  </div>
                 </div>
 
                 {/* Submit Request Button */}
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     type="submit"
                     disabled={isSubmittingBooking || !bookingTime}

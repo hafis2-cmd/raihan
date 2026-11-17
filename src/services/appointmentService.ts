@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 
 export type AppointmentStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
-export type ConsultationType = 'video' | 'in_person' | 'audio';
+export type ConsultationType = 'on_site' | 'in_person' | 'video' | 'audio';
 
 export interface Appointment {
   id: string;
@@ -26,7 +26,7 @@ export interface Appointment {
   patient_blood_group?: string;
   doctor_email: string;
   doctor_name: string;
-  doctor_specialty: string;
+  doctor_specialty?: string;
   doctor_image?: string;
   location: string;
   appointment_date: string; // YYYY-MM-DD
@@ -207,13 +207,13 @@ export async function requestAppointment(params: {
   patientBloodGroup?: string;
   doctorEmail: string;
   doctorName: string;
-  doctorSpecialty: string;
+  doctorSpecialty?: string;
   doctorImage?: string;
   location: string;
   date: string;
   time: string;
   duration?: number;
-  consultationType: ConsultationType;
+  consultationType?: ConsultationType;
   reason: string;
 }): Promise<Appointment> {
   const appointmentId = `apt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
@@ -229,13 +229,13 @@ export async function requestAppointment(params: {
     patient_blood_group: params.patientBloodGroup,
     doctor_email: params.doctorEmail,
     doctor_name: params.doctorName,
-    doctor_specialty: params.doctorSpecialty,
+    doctor_specialty: params.doctorSpecialty || 'Dental Surgeon',
     doctor_image: params.doctorImage,
     location: params.location,
     appointment_date: params.date,
     appointment_time: params.time,
     duration: params.duration || 30,
-    consultation_type: params.consultationType,
+    consultation_type: params.consultationType || 'on_site',
     reason: params.reason,
     status: 'PENDING',
     created_at: nowIso,

@@ -29,5 +29,24 @@
     "bio": "Licensed Dental Surgeon committed to patient-centered oral healthcare.",
     "verified": true,
     "createdAt": "2026-11-17T14:11:45.905Z"
+  },
+  {
+    "id": "dentist-1794925434112-fb4daf",
+    "email": "sarah@clinic.com",
+    "passwordHash": "3f9d1b35288d64edcd776d2e6093bf6e9451c1ec204ef54fcda5a363e953f882",
+    "role": "Dentist",
+    "name": "Dr. Sarah",
+    "phone": "",
+    "qualification": "BDS",
+    "licenseNumber": "DDC-99999",
+    "specialty": "General Dentistry",
+    "subSpecialty": "",
+    "hospitalAffiliation": "Raihan Dental Clinic",
+    "consultationFee": 50,
+    "workingHours": "09:00 AM - 05:00 PM, Mon-Sat",
+    "experience": 5,
+    "bio": "Licensed Dental Surgeon committed to patient-centered oral healthcare.",
+    "verified": true,
+    "createdAt": "2026-11-17T14:23:54.112Z"
   }
 ]
