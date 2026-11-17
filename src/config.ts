@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.PROD 
   ? "https://api.healthline.com"  // Your cloud hosted backend URL
-  : "http://localhost:3000";     // Local dev server
+  : (typeof window !== "undefined" ? window.location.origin : "http://localhost:5173");
 
 export default API_BASE_URL;
