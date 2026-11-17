@@ -372,9 +372,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </p>
             </div>
             
-            <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 shadow-xs overflow-hidden flex items-center justify-center text-emerald-800 dark:text-emerald-300 font-bold text-sm shrink-0">
-              {(profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'D' : 'P')).charAt(0).toUpperCase()}
-            </div>
+            <Link
+              to="/profile"
+              className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 shadow-xs overflow-hidden flex items-center justify-center text-emerald-800 dark:text-emerald-300 font-bold text-sm shrink-0 hover:ring-2 hover:ring-emerald-500/50 transition-all cursor-pointer"
+              title="View & Edit Profile"
+            >
+              {(profile?.photoURL || profile?.image) ? (
+                <img 
+                  src={profile.photoURL || profile.image} 
+                  alt={profile.name || 'User'} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                (profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'D' : 'P')).charAt(0).toUpperCase()
+              )}
+            </Link>
           </div>
         </header>
         

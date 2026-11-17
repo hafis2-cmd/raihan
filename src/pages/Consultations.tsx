@@ -13,7 +13,7 @@ import {
   Printer, 
   FileCheck
 } from 'lucide-react';
-import { useAuth, getRegisteredPatients } from '../context/AuthContext';
+import { useAuth, getRegisteredPatients, getRegisteredUsers } from '../context/AuthContext';
 import { 
   DentalConsultation, 
   DentalTreatmentCategory, 
@@ -51,6 +51,25 @@ export default function Consultations() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const registeredPatients = getRegisteredPatients();
+
+  const getPatientPhoto = (email?: string): string => {
+    if (!email) return '';
+    const emailLower = email.toLowerCase().trim();
+    if (profile?.email?.toLowerCase().trim() === emailLower) {
+      return profile.photoURL || profile.image || '';
+    }
+    const reg = getRegisteredUsers();
+    const found = reg.find(u => u.email.toLowerCase() === emailLower);
+    if (found?.photoURL || found?.image) return (found.photoURL || found.image)!;
+    try {
+      const stored = localStorage.getItem(`raihan_profile_${emailLower}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.photoURL || parsed.image) return parsed.photoURL || parsed.image;
+      }
+    } catch {}
+    return '';
+  };
 
   // Load consultations
   const loadData = () => {
@@ -352,8 +371,12 @@ export default function Consultations() {
             >
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-200 dark:border-emerald-800 shrink-0">
-                    {(cons.patient_name || 'P').charAt(0).toUpperCase()}
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-200 dark:border-emerald-800 shrink-0 overflow-hidden">
+                    {getPatientPhoto(cons.patient_email) ? (
+                      <img src={getPatientPhoto(cons.patient_email)} alt={cons.patient_name} className="w-full h-full object-cover" />
+                    ) : (
+                      (cons.patient_name || 'P').charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">

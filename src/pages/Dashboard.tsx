@@ -102,59 +102,84 @@ export default function Dashboard() {
       
       {/* Refined Clinic Hero Card */}
       <div className="bg-slate-900 dark:bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 text-white shadow-sm relative overflow-hidden">
-        <div className="relative z-10 max-w-2xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-emerald-400 text-xs font-medium border border-slate-700/60">
-            <span>Raihan Dental Clinic</span>
-            <span>•</span>
-            <span>{isDentist ? 'Clinical Dashboard' : 'Patient Portal'}</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-2xl space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-emerald-400 text-xs font-medium border border-slate-700/60">
+              <span>Raihan Dental Clinic</span>
+              <span>•</span>
+              <span>{isDentist ? 'Clinical Dashboard' : 'Patient Portal'}</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Welcome back, {displayName}
+            </h1>
+            
+            <p className="text-slate-300 text-sm leading-relaxed">
+              {isDentist 
+                ? 'Manage incoming patient consultation requests, examine clinical dental charts, configure chair hours, and track treatment billing.'
+                : 'Request on-site dental consultations with Dr. Raihan, review past clinical treatments, and view active prescriptions.'}
+            </p>
+
+            <div className="flex flex-wrap gap-2.5 pt-2">
+              {isDentist ? (
+                <>
+                  <Link 
+                    to="/appointments" 
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center gap-2 shadow-xs"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Pending Requests ({pendingRequests.length})</span>
+                  </Link>
+                  <Link 
+                    to="/consultations" 
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-medium text-xs transition-colors flex items-center gap-2 border border-slate-700"
+                  >
+                    <Stethoscope className="w-4 h-4 text-emerald-400" />
+                    <span>Record Consultation</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link 
+                    to="/appointments" 
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center gap-2 shadow-xs"
+                  >
+                    <CalendarPlus className="w-4 h-4" />
+                    <span>Request Dental Visit</span>
+                  </Link>
+                  <Link 
+                    to="/consultations" 
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-medium text-xs transition-colors flex items-center gap-2 border border-slate-700"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>My Dental Records</span>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Welcome back, {displayName}
-          </h1>
-          
-          <p className="text-slate-300 text-sm leading-relaxed">
-            {isDentist 
-              ? 'Manage incoming patient consultation requests, examine clinical dental charts, configure chair hours, and track treatment billing.'
-              : 'Request on-site dental consultations with Dr. Raihan, review past clinical treatments, and view active prescriptions.'}
-          </p>
-
-          <div className="flex flex-wrap gap-2.5 pt-2">
-            {isDentist ? (
-              <>
-                <Link 
-                  to="/appointments" 
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center gap-2 shadow-xs"
-                >
-                  <Calendar className="w-4 h-4" />
-                  <span>Pending Requests ({pendingRequests.length})</span>
-                </Link>
-                <Link 
-                  to="/consultations" 
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-medium text-xs transition-colors flex items-center gap-2 border border-slate-700"
-                >
-                  <Stethoscope className="w-4 h-4 text-emerald-400" />
-                  <span>Record Consultation</span>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link 
-                  to="/appointments" 
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-xs transition-colors flex items-center gap-2 shadow-xs"
-                >
-                  <CalendarPlus className="w-4 h-4" />
-                  <span>Request Dental Visit</span>
-                </Link>
-                <Link 
-                  to="/consultations" 
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-medium text-xs transition-colors flex items-center gap-2 border border-slate-700"
-                >
-                  <FileText className="w-4 h-4 text-emerald-400" />
-                  <span>My Dental Records</span>
-                </Link>
-              </>
-            )}
+          {/* User Profile Avatar Highlight */}
+          <div className="hidden sm:flex flex-col items-center justify-center shrink-0">
+            <Link 
+              to="/profile"
+              className="group relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-emerald-500/80 bg-slate-800 flex items-center justify-center text-emerald-400 font-bold text-2xl sm:text-3xl shadow-lg hover:ring-4 hover:ring-emerald-500/30 transition-all cursor-pointer"
+              title="View & Edit Profile"
+            >
+              {(profile?.photoURL || profile?.image) ? (
+                <img 
+                  src={profile.photoURL || profile.image} 
+                  alt={displayName} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                displayName.charAt(0).toUpperCase()
+              )}
+            </Link>
+            <span className="text-[11px] text-slate-400 font-medium mt-2">
+              {isDentist ? 'Chief Dentist' : 'Patient Profile'}
+            </span>
           </div>
         </div>
       </div>

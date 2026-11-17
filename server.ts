@@ -112,6 +112,12 @@ async function startServer() {
 
   app.use(express.json({ limit: "10mb" })); // Request size limits (Phase 4 API protection)
 
+  // Persistent Uploads Directory for Profile Photos
+  const UPLOADS_DIR = path.join(process.cwd(), "uploads", "avatars");
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   // API routes
   app.get("/api/health", (req, res) => {
@@ -145,6 +151,8 @@ async function startServer() {
     dentalHistory?: string;
     allergies?: string;
     verified?: boolean;
+    image?: string;
+    photoURL?: string;
     createdAt: string;
     updatedAt?: string;
   }
@@ -582,7 +590,7 @@ async function startServer() {
         return res.status(404).json({ error: "User not found." });
       }
 
-      const { name, phone, dob, gender, address, allergies, dentalHistory, qualification, licenseNumber, consultationFee, hospitalAffiliation, bio } = req.body;
+      const { name, phone, dob, gender, address, allergies, dentalHistory, qualification, licenseNumber, consultationFee, hospitalAffiliation, bio, image, photoURL } = req.body;
       if (name && String(name).trim()) user.name = String(name).trim();
       if (phone !== undefined) user.phone = String(phone).trim();
       if (dob !== undefined) user.dob = String(dob).trim();
@@ -595,6 +603,14 @@ async function startServer() {
       if (consultationFee !== undefined) user.consultationFee = consultationFee;
       if (hospitalAffiliation !== undefined) user.hospitalAffiliation = String(hospitalAffiliation).trim();
       if (bio !== undefined) user.bio = String(bio).trim();
+      if (image !== undefined) {
+        user.image = String(image).trim();
+        user.photoURL = String(image).trim();
+      }
+      if (photoURL !== undefined) {
+        user.photoURL = String(photoURL).trim();
+        if (!user.image) user.image = user.photoURL;
+      }
       user.updatedAt = new Date().toISOString();
 
       saveServerUsers(users);
@@ -603,6 +619,210 @@ async function startServer() {
       return res.json({ success: true, message: "Profile updated successfully", user: safeUser });
     } catch (err: any) {
       return res.status(500).json({ error: "Failed to update profile: " + err.message });
+    }
+  });
+
+  /**
+   * Helper to resolve authenticated user's email from JWT Bearer token or x-user-email header
+   */
+  function resolveUserEmail(req: express.Request): string {
+    const authHeader = req.headers.authorization;
+    const emailHeader = req.headers["x-user-email"];
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      const decoded = verifyToken(token);
+      if (decoded && decoded.email) {
+        return decoded.email.toLowerCase().trim();
+      }
+    }
+    if (emailHeader) {
+      return String(emailHeader).toLowerCase().trim();
+    }
+    return "";
+  }
+
+  /**
+   * 9. Upload & Replace Profile Photo
+   * Validates format (JPG/PNG/WebP), size (<= 5MB), magic bytes, saves to uploads/avatars, updates user
+   */
+  app.post("/api/profile/photo", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized. Please sign in to manage your profile photo." });
+      }
+
+      const { image } = req.body;
+      if (!image || typeof image !== "string") {
+        return res.status(400).json({ error: "No image payload provided." });
+      }
+
+      // 1. Format validation: check data URL header
+      const match = image.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        return res.status(400).json({ error: "Unsupported image format. Supported formats: JPG, PNG, and WebP." });
+      }
+
+      const base64Data = match[2];
+      const buffer = Buffer.from(base64Data, "base64");
+
+      // 2. Maximum file size: 5 MB
+      const MAX_SIZE = 5 * 1024 * 1024;
+      if (buffer.length > MAX_SIZE) {
+        return res.status(400).json({ error: "Image file exceeds the 5 MB maximum size limit." });
+      }
+
+      // 3. Magic bytes / image content validation
+      let isValidImage = false;
+      let extension = "jpg";
+
+      if (buffer.length >= 4) {
+        // JPEG: FF D8 FF
+        if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+          isValidImage = true;
+          extension = "jpg";
+        }
+        // PNG: 89 50 4E 47
+        else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+          isValidImage = true;
+          extension = "png";
+        }
+        // WebP: RIFF .... WEBP
+        else if (
+          buffer.length >= 12 &&
+          buffer.toString("ascii", 0, 4) === "RIFF" &&
+          buffer.toString("ascii", 8, 12) === "WEBP"
+        ) {
+          isValidImage = true;
+          extension = "webp";
+        }
+      }
+
+      if (!isValidImage) {
+        return res.status(400).json({ error: "Corrupted or invalid image file. Please select a valid photograph." });
+      }
+
+      const users = loadServerUsers();
+      const user = users.find(u => u.email.toLowerCase() === userEmail);
+      if (!user) {
+        return res.status(404).json({ error: "User profile not found in database." });
+      }
+
+      // 4. Clean up previous uploaded avatar file if it exists on disk
+      if (user.image && user.image.startsWith("/uploads/avatars/")) {
+        const oldFilename = path.basename(user.image.split("?")[0]);
+        const oldFilePath = path.join(UPLOADS_DIR, oldFilename);
+        if (fs.existsSync(oldFilePath)) {
+          try {
+            fs.unlinkSync(oldFilePath);
+          } catch (unlinkErr) {
+            console.warn("Could not remove previous avatar file:", unlinkErr);
+          }
+        }
+      }
+
+      // 5. Generate safe, unique filename
+      const safeId = user.id.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const safeFileName = `avatar_${safeId}_${Date.now()}.${extension}`;
+      const targetPath = path.join(UPLOADS_DIR, safeFileName);
+
+      fs.writeFileSync(targetPath, buffer);
+
+      const photoURL = `/uploads/avatars/${safeFileName}`;
+      user.image = photoURL;
+      user.photoURL = photoURL;
+      user.updatedAt = new Date().toISOString();
+
+      saveServerUsers(users);
+
+      return res.json({
+        success: true,
+        message: "Profile photo updated successfully.",
+        photoURL,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          photoURL,
+          image: photoURL
+        }
+      });
+    } catch (err: any) {
+      console.error("Profile photo upload error:", err);
+      return res.status(500).json({ error: "Failed to upload profile photo: " + err.message });
+    }
+  });
+
+  /**
+   * 10. Remove Profile Photo
+   * Deletes avatar from disk and restores default initial-based avatar
+   */
+  app.delete("/api/profile/photo", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized. Please sign in to remove your profile photo." });
+      }
+
+      const users = loadServerUsers();
+      const user = users.find(u => u.email.toLowerCase() === userEmail);
+      if (!user) {
+        return res.status(404).json({ error: "User profile not found in database." });
+      }
+
+      // Delete file from disk if local upload
+      if (user.image && user.image.startsWith("/uploads/avatars/")) {
+        const oldFilename = path.basename(user.image.split("?")[0]);
+        const oldFilePath = path.join(UPLOADS_DIR, oldFilename);
+        if (fs.existsSync(oldFilePath)) {
+          try {
+            fs.unlinkSync(oldFilePath);
+          } catch (unlinkErr) {
+            console.warn("Could not remove avatar file:", unlinkErr);
+          }
+        }
+      }
+
+      user.image = "";
+      user.photoURL = "";
+      user.updatedAt = new Date().toISOString();
+
+      saveServerUsers(users);
+
+      return res.json({
+        success: true,
+        message: "Profile photo removed successfully. Default avatar restored."
+      });
+    } catch (err: any) {
+      console.error("Profile photo deletion error:", err);
+      return res.status(500).json({ error: "Failed to remove profile photo: " + err.message });
+    }
+  });
+
+  /**
+   * 11. Retrieve Profile Photo
+   */
+  app.get("/api/profile/photo", (req, res) => {
+    try {
+      const email = String(req.query.email || "").toLowerCase().trim();
+      const userEmail = email || resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(400).json({ error: "User email parameter is required." });
+      }
+
+      const users = loadServerUsers();
+      const user = users.find(u => u.email.toLowerCase() === userEmail);
+      if (!user) {
+        return res.status(404).json({ error: "User not found." });
+      }
+
+      return res.json({
+        success: true,
+        photoURL: user.photoURL || user.image || null
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to retrieve photo: " + err.message });
     }
   });
 

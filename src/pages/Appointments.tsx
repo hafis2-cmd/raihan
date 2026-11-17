@@ -50,7 +50,7 @@ import {
   parseISO
 } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, getRegisteredDentists } from '../context/AuthContext';
+import { useAuth, getRegisteredDentists, getRegisteredUsers } from '../context/AuthContext';
 import { useConfirmation } from '../context/ConfirmationContext';
 import { db, isFirebaseConfigured } from '../firebase';
 import { 
@@ -93,6 +93,25 @@ export default function Appointments() {
 
   const isDoctor = profile?.role === 'Doctor' || profile?.role === 'Dentist';
   const isPatient = !isDoctor; // default patient view
+
+  const getPersonPhoto = (email?: string): string => {
+    if (!email) return '';
+    const emailLower = email.toLowerCase().trim();
+    if (profile?.email?.toLowerCase().trim() === emailLower) {
+      return profile.photoURL || profile.image || '';
+    }
+    const reg = getRegisteredUsers();
+    const found = reg.find(u => u.email.toLowerCase() === emailLower);
+    if (found?.photoURL || found?.image) return (found.photoURL || found.image)!;
+    try {
+      const stored = localStorage.getItem(`raihan_profile_${emailLower}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.photoURL || parsed.image) return parsed.photoURL || parsed.image;
+      }
+    } catch {}
+    return '';
+  };
 
   // Core Data States
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -715,8 +734,12 @@ export default function Appointments() {
                     >
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                         <div className="flex items-start gap-3.5">
-                          <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-base border border-amber-200 dark:border-amber-800/60 shrink-0">
-                            {(appt.patient_name || 'P').charAt(0).toUpperCase()}
+                          <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-base border border-amber-200 dark:border-amber-800/60 shrink-0 overflow-hidden">
+                            {getPersonPhoto(appt.patient_email) ? (
+                              <img src={getPersonPhoto(appt.patient_email)} alt={appt.patient_name} className="w-full h-full object-cover" />
+                            ) : (
+                              (appt.patient_name || 'P').charAt(0).toUpperCase()
+                            )}
                           </div>
                           <div className="space-y-0.5">
                             <div className="flex flex-wrap items-center gap-2">
@@ -819,8 +842,12 @@ export default function Appointments() {
                     <div key={appt.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60">
-                            {(appt.patient_name || 'P').charAt(0).toUpperCase()}
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60 overflow-hidden">
+                            {getPersonPhoto(appt.patient_email) ? (
+                              <img src={getPersonPhoto(appt.patient_email)} alt={appt.patient_name} className="w-full h-full object-cover" />
+                            ) : (
+                              (appt.patient_name || 'P').charAt(0).toUpperCase()
+                            )}
                           </div>
                           <div>
                             <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{appt.patient_name}</h4>
@@ -1372,8 +1399,12 @@ export default function Appointments() {
                     <div key={appt.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60">
-                            {(appt.doctor_name || 'D').charAt(0).toUpperCase()}
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60 overflow-hidden">
+                            {getPersonPhoto(appt.doctor_email) ? (
+                              <img src={getPersonPhoto(appt.doctor_email)} alt={appt.doctor_name} className="w-full h-full object-cover" />
+                            ) : (
+                              (appt.doctor_name || 'D').charAt(0).toUpperCase()
+                            )}
                           </div>
                           <div>
                             <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">

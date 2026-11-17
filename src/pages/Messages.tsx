@@ -16,7 +16,7 @@ import {
   Calendar,
   Stethoscope
 } from 'lucide-react';
-import { useAuth, getRegisteredPatients } from '../context/AuthContext';
+import { useAuth, getRegisteredPatients, getRegisteredUsers } from '../context/AuthContext';
 import { db } from '../firebase';
 import { 
   collection, 
@@ -75,6 +75,27 @@ export default function Messages() {
   const [otherUserStatus, setOtherUserStatus] = useState<{ isOnline: boolean; lastSeen: any; typingTo: string | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout| null>(null);
+
+  const getUserPhoto = (email?: string): string => {
+    if (!email) return '';
+    const emailLower = email.toLowerCase().trim();
+    if (profile?.email?.toLowerCase().trim() === emailLower) {
+      return profile.photoURL || profile.image || '';
+    }
+    const reg = getRegisteredUsers();
+    const found = reg.find(u => u.email.toLowerCase() === emailLower);
+    if (found?.photoURL || found?.image) return (found.photoURL || found.image)!;
+
+    try {
+      const stored = localStorage.getItem(`raihan_profile_${emailLower}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.photoURL || parsed.image) return parsed.photoURL || parsed.image;
+      }
+    } catch {}
+
+    return '';
+  };
 
   // Fetch conversations
   useEffect(() => {
@@ -411,8 +432,12 @@ export default function Messages() {
                       isSelected && "bg-emerald-50/60 dark:bg-emerald-950/30 border-l-4 border-l-emerald-600"
                     )}
                   >
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                      {(data.name || 'U').charAt(0).toUpperCase()}
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      {getUserPhoto(other) ? (
+                        <img src={getUserPhoto(other)} alt={data.name || 'User'} className="w-full h-full object-cover" />
+                      ) : (
+                        (data.name || 'U').charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center mb-0.5">
@@ -468,8 +493,12 @@ export default function Messages() {
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                  {(otherData.name || 'U').charAt(0).toUpperCase()}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 overflow-hidden">
+                  {getUserPhoto(otherParticipant || undefined) ? (
+                    <img src={getUserPhoto(otherParticipant || undefined)} alt={otherData.name || 'User'} className="w-full h-full object-cover" />
+                  ) : (
+                    (otherData.name || 'U').charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
@@ -617,8 +646,12 @@ export default function Messages() {
                         onClick={() => handleStartNewChat(target)}
                         className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors text-left cursor-pointer"
                       >
-                        <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs border border-emerald-200 dark:border-emerald-800">
-                          {(target.name || 'U').charAt(0).toUpperCase()}
+                        <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs border border-emerald-200 dark:border-emerald-800 overflow-hidden">
+                          {getUserPhoto(target.email) ? (
+                            <img src={getUserPhoto(target.email)} alt={target.name || 'User'} className="w-full h-full object-cover" />
+                          ) : (
+                            (target.name || 'U').charAt(0).toUpperCase()
+                          )}
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{target.name || 'User'}</p>

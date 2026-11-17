@@ -40,6 +40,8 @@ interface PatientRecord {
   email: string;
   name: string;
   phone?: string;
+  photoURL?: string;
+  image?: string;
   age?: number;
   gender?: string;
   dob?: string;
@@ -87,6 +89,7 @@ export default function Patients() {
         email: p.email,
         name: p.name,
         phone: p.phone,
+        photoURL: p.photoURL || p.image || '',
         age: p.age,
         gender: p.gender,
         dob: p.dob,
@@ -114,6 +117,7 @@ export default function Patients() {
               ...existing,
               name: stored.name || existing.name,
               phone: stored.phone || existing.phone,
+              photoURL: stored.photoURL || stored.image || existing.photoURL || '',
               age: stored.age || existing.age,
               gender: stored.gender || existing.gender,
               dob: stored.dob || existing.dob,
@@ -247,8 +251,12 @@ export default function Patients() {
               <div className="space-y-3.5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60 shrink-0">
-                      {patient.name.charAt(0).toUpperCase()}
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-base border border-emerald-100 dark:border-emerald-800/60 shrink-0 overflow-hidden">
+                      {patient.photoURL ? (
+                        <img src={patient.photoURL} alt={patient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        patient.name.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div>
                       <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{patient.name}</h4>
@@ -311,8 +319,12 @@ export default function Patients() {
               {/* Modal Header */}
               <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-700 dark:text-emerald-300 font-bold text-lg border border-emerald-100 dark:border-emerald-800/60">
-                    {selectedPatient.name.charAt(0).toUpperCase()}
+                  <div className="w-11 h-11 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-700 dark:text-emerald-300 font-bold text-lg border border-emerald-100 dark:border-emerald-800/60 shrink-0 overflow-hidden">
+                    {selectedPatient.photoURL ? (
+                      <img src={selectedPatient.photoURL} alt={selectedPatient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      selectedPatient.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">

@@ -9,7 +9,10 @@
     "dob": "2003-06-13",
     "gender": "Male",
     "verified": true,
-    "createdAt": "2026-11-17T14:05:14.918Z"
+    "createdAt": "2026-11-17T14:05:14.918Z",
+    "image": "",
+    "photoURL": "",
+    "updatedAt": "2026-11-17T18:27:24.243Z"
   },
   {
     "id": "dentist-1794924705904-8f7670",
@@ -28,7 +31,10 @@
     "experience": 5,
     "bio": "Licensed Dental Surgeon committed to patient-centered oral healthcare.",
     "verified": true,
-    "createdAt": "2026-11-17T14:11:45.905Z"
+    "createdAt": "2026-11-17T14:11:45.905Z",
+    "image": "",
+    "photoURL": "",
+    "updatedAt": "2026-11-17T18:26:50.390Z"
   },
   {
     "id": "dentist-1794925434112-fb4daf",

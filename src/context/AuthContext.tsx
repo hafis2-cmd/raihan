@@ -35,6 +35,7 @@ export interface RegisteredUser {
   bio?: string;
   experience?: number;
   image?: string;
+  photoURL?: string;
   age?: number;
   gender?: 'Male' | 'Female' | 'Other';
   dob?: string;
@@ -256,6 +257,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateRole: (role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => Promise<void>;
   updateProfile: (updatedData: Partial<UserProfile>) => Promise<void>;
+  uploadProfilePhoto: (base64Image: string) => Promise<string>;
+  removeProfilePhoto: () => Promise<void>;
   googleToken: string | null;
   connectGoogleCalendar: () => Promise<string | null>;
 }
@@ -267,31 +270,37 @@ const getStoredProfile = (email: string, role: 'Doctor' | 'Dentist' | 'Patient' 
   const emailKey = `raihan_profile_${trimmed}`;
   const stored = localStorage.getItem(emailKey);
 
-  // Look up registered user to always resolve registered full name as primary source
+  // Look up registered user to always resolve registered full name and photo
   const registered = getRegisteredUsers();
   const existing = registered.find(u => u.email.toLowerCase() === trimmed);
   const registeredName = existing?.name?.trim() || '';
+  const registeredPhoto = existing?.image || '';
 
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
       const finalName = (parsed.name && parsed.name.trim()) ? parsed.name.trim() : registeredName;
+      const finalPhoto = parsed.photoURL || parsed.image || registeredPhoto || '';
       return { 
         ...parsed, 
         email: trimmed, 
         role: (role === 'Doctor' ? 'Dentist' : role) as any,
-        name: finalName
+        name: finalName,
+        photoURL: finalPhoto,
+        image: finalPhoto
       };
     } catch (e) {
       console.warn("Failed to parse stored profile for", email, e);
     }
   }
 
-  // Production blank profile with registered database name
+  // Production blank profile with registered database name and photo
   return {
     email: trimmed,
     role: (role === 'Doctor' ? 'Dentist' : role) as any,
     name: registeredName,
+    photoURL: registeredPhoto,
+    image: registeredPhoto,
     subscribed: trimmed === ADMIN_EMAIL,
     isOnline: true,
     createdAt: new Date(),
@@ -362,7 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          // Fetch fresh profile from backend API to ensure real database name is synchronized
+          // Fetch fresh profile from backend API to ensure real database name and photo are synchronized
           fetch('/api/auth/me', {
             headers: {
               ...(parsedUser.token ? { 'Authorization': `Bearer ${parsedUser.token}` } : {}),
@@ -371,14 +380,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
             .then(r => r.json())
             .then(data => {
-              if (data.success && data.user && data.user.name) {
+              if (data.success && data.user) {
+                const userPhoto = data.user.photoURL || data.user.image || parsedProfile.photoURL || '';
                 const updatedProf = {
                   ...parsedProfile,
                   ...data.user,
-                  name: data.user.name,
+                  name: data.user.name || parsedProfile.name,
+                  photoURL: userPhoto,
+                  image: userPhoto,
                   role: parsedProfile.role || data.user.role
                 };
-                parsedUser.displayName = data.user.name;
+                if (data.user.name) parsedUser.displayName = data.user.name;
+                parsedUser.photoURL = userPhoto;
                 localStorage.setItem(emailKey, JSON.stringify(updatedProf));
                 localStorage.setItem('raihan_active_profile', JSON.stringify(updatedProf));
                 localStorage.setItem('raihan_active_user', JSON.stringify(parsedUser));
@@ -391,6 +404,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (parsedProfile.name) {
           parsedUser.displayName = parsedProfile.name;
+        }
+        if (parsedProfile.photoURL || parsedProfile.image) {
+          parsedUser.photoURL = parsedProfile.photoURL || parsedProfile.image;
         }
 
         setUser(parsedUser);
@@ -563,11 +579,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (data.user.specialty) storedProf.specialty = data.user.specialty;
             if (data.user.qualification) storedProf.education = data.user.qualification;
             if (data.user.licenseNumber) storedProf.licenseNumber = data.user.licenseNumber;
+            if (data.user.image || data.user.photoURL) {
+              const photo = data.user.photoURL || data.user.image;
+              storedProf.photoURL = photo;
+              storedProf.image = photo;
+            }
 
             const authSessionUser = {
               uid: data.user.id,
               email: data.user.email,
               displayName: data.user.name,
+              photoURL: storedProf.photoURL,
               token: data.token
             };
 
@@ -1028,6 +1050,144 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   };
 
+  /**
+   * Upload & Replace Profile Photo
+   * Calls POST /api/profile/photo, persists to profile/user state and local storage,
+   * and dispatches global event so that all UI components update in real-time.
+   */
+  const uploadProfilePhoto = async (base64Image: string): Promise<string> => {
+    if (!user && !profile) {
+      throw new Error("You must be logged in to upload a profile photo.");
+    }
+    const email = (profile?.email || user?.email || '').toLowerCase().trim();
+    const token = user?.token;
+
+    const resp = await fetch('/api/profile/photo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'x-user-email': email
+      },
+      body: JSON.stringify({ image: base64Image })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.error || "Failed to upload profile photo.");
+    }
+
+    const newPhotoURL = data.photoURL;
+
+    // 1. Update in-memory profile and active profile in localStorage
+    if (profile) {
+      const updatedProfile: UserProfile = {
+        ...profile,
+        photoURL: newPhotoURL,
+        image: newPhotoURL,
+        updatedAt: new Date()
+      };
+      setProfile(updatedProfile);
+      localStorage.setItem('raihan_active_profile', JSON.stringify(updatedProfile));
+      if (email) {
+        localStorage.setItem(`raihan_profile_${email}`, JSON.stringify(updatedProfile));
+      }
+    }
+
+    if (user) {
+      const updatedUser = {
+        ...user,
+        photoURL: newPhotoURL,
+        image: newPhotoURL
+      };
+      setUser(updatedUser);
+      localStorage.setItem('raihan_active_user', JSON.stringify(updatedUser));
+    }
+
+    // 2. Update registered users list
+    if (email) {
+      const regUsers = getRegisteredUsers();
+      const uIdx = regUsers.findIndex(u => u.email.toLowerCase() === email);
+      if (uIdx !== -1) {
+        regUsers[uIdx].image = newPhotoURL;
+        regUsers[uIdx].photoURL = newPhotoURL;
+        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(regUsers));
+      }
+    }
+
+    // 3. Dispatch global events
+    window.dispatchEvent(new Event('raihan_profile_updated'));
+    window.dispatchEvent(new Event('raihan_users_updated'));
+
+    return newPhotoURL;
+  };
+
+  /**
+   * Remove Profile Photo
+   * Calls DELETE /api/profile/photo, clears avatar from disk and database,
+   * and dispatches global event to restore initial-based circular avatar.
+   */
+  const removeProfilePhoto = async (): Promise<void> => {
+    if (!user && !profile) {
+      throw new Error("You must be logged in to remove your profile photo.");
+    }
+    const email = (profile?.email || user?.email || '').toLowerCase().trim();
+    const token = user?.token;
+
+    const resp = await fetch('/api/profile/photo', {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'x-user-email': email
+      }
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.error || "Failed to remove profile photo.");
+    }
+
+    // 1. Clear photo from in-memory profile and active profile in localStorage
+    if (profile) {
+      const updatedProfile: UserProfile = {
+        ...profile,
+        photoURL: '',
+        image: '',
+        updatedAt: new Date()
+      };
+      setProfile(updatedProfile);
+      localStorage.setItem('raihan_active_profile', JSON.stringify(updatedProfile));
+      if (email) {
+        localStorage.setItem(`raihan_profile_${email}`, JSON.stringify(updatedProfile));
+      }
+    }
+
+    if (user) {
+      const updatedUser = {
+        ...user,
+        photoURL: '',
+        image: ''
+      };
+      setUser(updatedUser);
+      localStorage.setItem('raihan_active_user', JSON.stringify(updatedUser));
+    }
+
+    // 2. Clear from registered users list
+    if (email) {
+      const regUsers = getRegisteredUsers();
+      const uIdx = regUsers.findIndex(u => u.email.toLowerCase() === email);
+      if (uIdx !== -1) {
+        regUsers[uIdx].image = '';
+        regUsers[uIdx].photoURL = '';
+        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(regUsers));
+      }
+    }
+
+    // 3. Dispatch global events
+    window.dispatchEvent(new Event('raihan_profile_updated'));
+    window.dispatchEvent(new Event('raihan_users_updated'));
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -1042,6 +1202,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout, 
       updateRole, 
       updateProfile,
+      uploadProfilePhoto,
+      removeProfilePhoto,
       googleToken, 
       connectGoogleCalendar 
     }}>
