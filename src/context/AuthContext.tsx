@@ -25,20 +25,42 @@ export interface UserProfile {
   createdAt: any;
   updatedAt?: any;
   name?: string;
-  age?: number;
-  gender?: 'Male' | 'Female' | 'Other';
-  bloodGroup?: string;
-  allergies?: string;
-  medicalHistory?: string;
-  specialty?: string;
-  bio?: string;
-  location?: string;
-  experience?: number;
-  photoURL?: string;
+  phone?: string;
   image?: string;
+  photoURL?: string;
   isOnline?: boolean;
   lastSeen?: any;
   typingTo?: string | null;
+
+  // Patient-specific accurate fields
+  age?: number;
+  gender?: 'Male' | 'Female' | 'Other';
+  dob?: string;
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  address?: string;
+  allergies?: string;
+  medicalHistory?: string;
+  currentMedications?: string;
+  chronicConditions?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+
+  // Doctor-specific accurate fields
+  specialty?: string;
+  subSpecialty?: string;
+  licenseNumber?: string;
+  education?: string;
+  experience?: number;
+  location?: string;
+  hospitalAffiliation?: string;
+  consultationFee?: number | string;
+  workingHours?: string;
+  bio?: string;
 }
 
 interface AuthContextType {
@@ -52,11 +74,88 @@ interface AuthContextType {
   signupWithEmail: (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Admin') => Promise<void>;
   logout: () => Promise<void>;
   updateRole: (role: 'Patient' | 'Doctor' | 'Admin') => Promise<void>;
+  updateProfile: (updatedData: Partial<UserProfile>) => Promise<void>;
   googleToken: string | null;
   connectGoogleCalendar: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const getStoredProfile = (email: string, role: 'Doctor' | 'Patient' | 'Admin'): UserProfile => {
+  const emailKey = `raihan_profile_${email.toLowerCase().trim()}`;
+  const stored = localStorage.getItem(emailKey);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      return { ...parsed, email, role };
+    } catch (e) {
+      console.warn("Failed to parse stored profile for", email, e);
+    }
+  }
+
+  if (role === 'Doctor') {
+    return {
+      email,
+      role: 'Doctor',
+      name: 'Dr. Raihan (MD)',
+      subscribed: true,
+      phone: '+1 (555) 234-5678',
+      specialty: 'Cardiologist & General Tele-Consultant',
+      subSpecialty: 'Preventive Cardiology & Internal Medicine',
+      licenseNumber: 'RMC-84920-IN',
+      education: 'MBBS, MD (General Medicine), FACC',
+      experience: 12,
+      location: 'Raihan Central Hospital, Suite 402',
+      hospitalAffiliation: 'Raihan Healthcare Network',
+      consultationFee: 50,
+      workingHours: '09:00 AM - 05:00 PM, Mon-Sat',
+      bio: 'Board-certified clinical specialist with over 12 years of clinical practice and digital telemedicine consultation experience. Specializing in cardiovascular prevention and evidence-based medicine.',
+      isOnline: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  } else if (role === 'Patient') {
+    return {
+      email,
+      role: 'Patient',
+      name: 'John Doe',
+      subscribed: true,
+      age: 29,
+      gender: 'Male',
+      dob: '1995-04-12',
+      bloodGroup: 'O+',
+      height: '178 cm',
+      weight: '72 kg',
+      phone: '+1 (555) 876-5432',
+      address: '742 Evergreen Terrace, Sector 4, Metro City',
+      allergies: 'Penicillin, Dust pollen (mild)',
+      medicalHistory: 'Appendectomy (2018). Occasional seasonal allergy symptoms.',
+      currentMedications: 'Cetirizine 10mg as needed, Vitamin D3 (60K IU weekly)',
+      chronicConditions: 'None reported',
+      emergencyContactName: 'Jane Doe',
+      emergencyContactPhone: '+1 (555) 987-6543',
+      emergencyContactRelation: 'Spouse',
+      insuranceProvider: 'BlueShield Healthcare',
+      insurancePolicyNumber: 'BS-9948271-X',
+      isOnline: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  } else {
+    return {
+      email,
+      role: 'Admin',
+      name: 'System Administrator',
+      subscribed: true,
+      phone: '+1 (555) 000-1111',
+      location: 'Raihan Telemedicine Operations Hub',
+      bio: 'Platform & Clinical System Administrator with global operations access.',
+      isOnline: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
@@ -72,6 +171,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsedUser = JSON.parse(savedUserJson);
         const parsedProfile = JSON.parse(savedProfileJson);
+        
+        // If an updated profile exists specifically under this email, prioritize it
+        if (parsedUser.email) {
+          const emailKey = `raihan_profile_${parsedUser.email.toLowerCase().trim()}`;
+          const emailSaved = localStorage.getItem(emailKey);
+          if (emailSaved) {
+            const parsedEmailProfile = JSON.parse(emailSaved);
+            setUser(parsedUser);
+            setProfile(parsedEmailProfile);
+            setLoading(false);
+            return;
+          }
+        }
+
         setUser(parsedUser);
         setProfile(parsedProfile);
         setLoading(false);
@@ -122,13 +235,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: data.name,
           age: data.age,
           gender: data.gender,
+          dob: data.dob,
           bloodGroup: data.bloodGroup,
+          height: data.height,
+          weight: data.weight,
+          phone: data.phone,
+          address: data.address,
           allergies: data.allergies,
           medicalHistory: data.medicalHistory,
+          currentMedications: data.currentMedications,
+          chronicConditions: data.chronicConditions,
+          emergencyContactName: data.emergencyContactName,
+          emergencyContactPhone: data.emergencyContactPhone,
+          emergencyContactRelation: data.emergencyContactRelation,
+          insuranceProvider: data.insuranceProvider,
+          insurancePolicyNumber: data.insurancePolicyNumber,
           specialty: data.specialty,
-          bio: data.bio,
-          location: data.location,
+          subSpecialty: data.subSpecialty,
+          licenseNumber: data.licenseNumber,
+          education: data.education,
           experience: data.experience,
+          location: data.location,
+          hospitalAffiliation: data.hospitalAffiliation,
+          consultationFee: data.consultationFee,
+          workingHours: data.workingHours,
+          bio: data.bio,
           photoURL: data.photoURL || data.image,
           image: data.image || data.photoURL,
           isOnline: data.isOnline,
@@ -137,11 +268,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } as UserProfile);
       } else {
         const finalRole = currentUser.email === ADMIN_EMAIL ? 'Admin' : 'Patient';
+        const defaultProfile = getStoredProfile(currentUser.email || '', finalRole);
         const newProfile = {
+          ...defaultProfile,
           email: currentUser.email || '',
           role: finalRole,
           subscribed: currentUser.email === ADMIN_EMAIL,
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || '',
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || defaultProfile.name,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
@@ -160,13 +293,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn('Profile fetch handled:', err);
       // Fallback local profile for current user
       const finalRole = currentUser.email === ADMIN_EMAIL ? 'Admin' : 'Patient';
-      setProfile({
-        email: currentUser.email || 'user@raihan.med',
-        role: finalRole,
-        subscribed: true,
-        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raihan User',
-        createdAt: new Date()
-      } as UserProfile);
+      const fallback = getStoredProfile(currentUser.email || 'user@raihan.med', finalRole);
+      setProfile(fallback);
     } finally {
       setLoading(false);
     }
@@ -177,37 +305,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const email = role === 'Admin' 
       ? ADMIN_EMAIL 
       : (role === 'Doctor' ? 'dr.raihan@telemed.com' : 'patient@telemed.com');
-    const name = role === 'Admin' 
-      ? 'System Administrator' 
-      : (role === 'Doctor' ? 'Dr. Raihan (MD)' : 'John Doe');
+
+    // Retrieve stored profile for this email so previous edits are retained
+    const demoProfile = getStoredProfile(email, role);
 
     const demoUser = {
       uid: `demo-${role.toLowerCase()}-001`,
       email,
-      displayName: name,
-    };
-
-    const demoProfile: UserProfile = {
-      email,
-      role,
-      name,
-      subscribed: true,
-      specialty: role === 'Doctor' ? 'General Medicine & Tele-Consultation' : undefined,
-      experience: role === 'Doctor' ? 12 : undefined,
-      bio: role === 'Doctor' ? 'Chief Medical Officer at Raihan Telemedicine Clinic.' : undefined,
-      location: 'Raihan Central Hospital',
-      isOnline: true,
-      age: role === 'Patient' ? 29 : 42,
-      gender: 'Male',
-      bloodGroup: 'O+',
-      allergies: 'None',
-      medicalHistory: 'Regular clinical follow-ups. Good health profile.',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      displayName: demoProfile.name || (role === 'Doctor' ? 'Dr. Raihan (MD)' : 'John Doe'),
     };
 
     localStorage.setItem('raihan_active_user', JSON.stringify(demoUser));
     localStorage.setItem('raihan_active_profile', JSON.stringify(demoProfile));
+    localStorage.setItem(`raihan_profile_${email.toLowerCase().trim()}`, JSON.stringify(demoProfile));
+
     setUser(demoUser);
     setProfile(demoProfile);
     setLoading(false);
@@ -364,6 +475,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   };
 
+  const updateProfile = async (updatedData: Partial<UserProfile>) => {
+    if (!profile && !user) return;
+    setLoading(true);
+
+    const email = profile?.email || user?.email || '';
+    const merged: UserProfile = {
+      ...(profile || {}),
+      ...updatedData,
+      email,
+      role: (updatedData.role || profile?.role || 'Patient') as any,
+      subscribed: profile?.subscribed ?? true,
+      updatedAt: new Date()
+    } as UserProfile;
+
+    // Update in-memory state so all UI updates immediately
+    setProfile(merged);
+
+    // Save to active profile key
+    localStorage.setItem('raihan_active_profile', JSON.stringify(merged));
+
+    // Save to permanent per-email key so data retains permanently until next edited
+    if (email) {
+      const emailKey = `raihan_profile_${email.toLowerCase().trim()}`;
+      localStorage.setItem(emailKey, JSON.stringify(merged));
+    }
+
+    // Update user object if name changed
+    if (updatedData.name && user) {
+      const updatedUser = { ...user, displayName: updatedData.name };
+      setUser(updatedUser);
+      localStorage.setItem('raihan_active_user', JSON.stringify(updatedUser));
+    }
+
+    // Write to Firestore if configured
+    if (isFirebaseConfigured && auth.currentUser) {
+      try {
+        const userDocRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(userDocRef, {
+          ...updatedData,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        console.error("Firestore update error:", err);
+      }
+    }
+
+    setLoading(false);
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -376,6 +536,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signupWithEmail, 
       logout, 
       updateRole, 
+      updateProfile,
       googleToken, 
       connectGoogleCalendar 
     }}>
