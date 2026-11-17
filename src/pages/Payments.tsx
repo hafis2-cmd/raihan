@@ -47,6 +47,7 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all');
   const handleDownloadReceipt = (p: Payment) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {

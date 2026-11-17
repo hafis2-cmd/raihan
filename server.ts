@@ -58,7 +58,7 @@ let geminiUsageHistory: UsageLog[] = [
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 5173;
+  const PORT = Number(process.env.PORT) || 5173;
 
   // Set security HTTP headers via helmet (allow inline scripts/styles for development)
   app.use(helmet({

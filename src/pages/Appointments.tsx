@@ -23,7 +23,19 @@ import {
   Check,
   MessageSquare,
   FileText,
-  CreditCard
+  CreditCard,
+  Phone,
+  ShieldAlert,
+  CheckCheck,
+  XCircle,
+  HelpCircle,
+  Stethoscope,
+  Trash2,
+  RefreshCw,
+  Award,
+  Building,
+  Info,
+  History
 } from 'lucide-react';
 import { 
   format, 
@@ -41,19 +53,33 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfirmation } from '../context/ConfirmationContext';
-import { db } from '../firebase';
+import { db, isFirebaseConfigured } from '../firebase';
 import { 
   collection, 
   query, 
   where, 
-  orderBy, 
   getDocs, 
   doc, 
   updateDoc, 
-  addDoc, 
-  deleteDoc, 
   onSnapshot 
 } from 'firebase/firestore';
+import { 
+  Appointment, 
+  DoctorSlot, 
+  ConsultationType,
+  requestAppointment, 
+  acceptAppointment, 
+  rejectAppointment, 
+  cancelAppointment, 
+  completeAppointment,
+  addDoctorSlot,
+  batchAddDoctorSlots,
+  deleteDoctorSlot,
+  getLocalAppointments,
+  saveLocalAppointments,
+  getLocalSlots,
+  initSeedSlots
+} from '../services/appointmentService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -61,79 +87,397 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Mock Doctors Data
-const DOCTORS = [
+// Medical Specialists default catalog
+const DEFAULT_DOCTORS = [
   {
-    id: '1',
-    name: 'Dr. Sarah Johnson',
-    specialty: 'Cardiologist',
+    id: 'doc-raihan',
+    email: 'dr.raihan@telemed.com',
+    name: 'Dr. Raihan (MD)',
+    specialty: 'Cardiology',
+    subSpecialty: 'Preventive Cardiology & Internal Medicine',
     rating: 4.9,
-    reviews: 124,
-    location: 'Central Heart Institute',
-    image: 'https://picsum.photos/seed/doc1/200/200',
-    availability: ['09:00 AM', '10:30 AM', '02:00 PM', '04:30 PM']
+    reviews: 142,
+    location: 'Raihan Central Hospital, Suite 402',
+    experience: 12,
+    fee: 50,
+    education: 'MBBS, MD (General Medicine), FACC',
+    image: 'https://picsum.photos/seed/raihan-doc/200/200',
+    availableHours: '09:00 AM - 05:00 PM'
   },
   {
-    id: '2',
+    id: 'doc-sarah',
+    email: 'dr.sarah@telemed.com',
+    name: 'Dr. Sarah Johnson',
+    specialty: 'Cardiology',
+    subSpecialty: 'Interventional Cardiology',
+    rating: 4.9,
+    reviews: 124,
+    location: 'Central Heart Institute, Floor 3',
+    experience: 14,
+    fee: 65,
+    education: 'MD, FACC',
+    image: 'https://picsum.photos/seed/doc1/200/200',
+    availableHours: '09:00 AM - 04:30 PM'
+  },
+  {
+    id: 'doc-michael',
+    email: 'dr.michael@telemed.com',
     name: 'Dr. Michael Chen',
-    specialty: 'Dermatologist',
+    specialty: 'Dermatology',
+    subSpecialty: 'Clinical & Cosmetic Dermatology',
     rating: 4.8,
     reviews: 89,
     location: 'Skin & Wellness Center',
+    experience: 9,
+    fee: 45,
+    education: 'MD (Dermatology)',
     image: 'https://picsum.photos/seed/doc2/200/200',
-    availability: ['11:00 AM', '01:30 PM', '03:00 PM', '05:00 PM']
+    availableHours: '11:00 AM - 05:00 PM'
   },
   {
-    id: '3',
+    id: 'doc-emily',
+    email: 'dr.emily@telemed.com',
     name: 'Dr. Emily White',
-    specialty: 'Pediatrician',
+    specialty: 'Pediatrics',
+    subSpecialty: 'Pediatric Primary Care & Development',
     rating: 5.0,
     reviews: 210,
-    location: 'Children\'s Care Hospital',
+    location: "Children's Care Hospital",
+    experience: 11,
+    fee: 55,
+    education: 'MD, FAAP',
     image: 'https://picsum.photos/seed/doc3/200/200',
-    availability: ['08:30 AM', '10:00 AM', '12:30 PM', '03:30 PM']
+    availableHours: '08:30 AM - 03:30 PM'
   },
   {
-    id: '4',
+    id: 'doc-james',
+    email: 'dr.james@telemed.com',
     name: 'Dr. James Wilson',
-    specialty: 'Neurologist',
+    specialty: 'Neurology',
+    subSpecialty: 'Neuro-vascular & Migraine Care',
     rating: 4.7,
-    reviews: 56,
-    location: 'NeuroScience Clinic',
+    reviews: 78,
+    location: 'Metro NeuroScience Clinic',
+    experience: 16,
+    fee: 70,
+    education: 'MD, PhD',
     image: 'https://picsum.photos/seed/doc4/200/200',
-    availability: ['09:30 AM', '11:30 AM', '02:30 PM', '04:00 PM']
+    availableHours: '10:00 AM - 04:00 PM'
   }
 ];
 
+const SPECIALTY_FILTERS = [
+  'All',
+  'Cardiology',
+  'Dermatology',
+  'Pediatrics',
+  'Neurology',
+  'General Medicine',
+  'Orthopedics'
+];
+
 export default function Appointments() {
-  const { profile, user } = useAuth();
+  const { profile, user, googleToken, connectGoogleCalendar } = useAuth();
   const navigate = useNavigate();
   const { confirm } = useConfirmation();
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [doctors, setDoctors] = useState<any[]>([]);
+
+  const isDoctor = profile?.role === 'Doctor';
+  const isPatient = !isDoctor; // default patient view
+
+  // Core Data States
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [slots, setSlots] = useState<DoctorSlot[]>([]);
+  const [doctors, setDoctors] = useState<any[]>(DEFAULT_DOCTORS);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBooking, setIsBooking] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
+
+  // View / Filter States
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
-  const [isCheckingSlots, setIsCheckingSlots] = useState(false);
-  const [newSlotTime, setNewSlotTime] = useState('09:00');
-  const [newSlotDate, setNewSlotDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isAddingSlot, setIsAddingSlot] = useState(false);
-  const [doctorSlots, setDoctorSlots] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState('All');
 
-  const { googleToken, connectGoogleCalendar } = useAuth();
+  // Doctor Tab States
+  // 'requests' | 'upcoming' | 'availability' | 'history'
+  const [doctorActiveTab, setDoctorActiveTab] = useState<'requests' | 'upcoming' | 'availability' | 'history'>('requests');
+
+  // Patient Tab States
+  // 'book' | 'pending' | 'confirmed' | 'rejected' | 'history'
+  const [patientActiveTab, setPatientActiveTab] = useState<'book' | 'pending' | 'confirmed' | 'rejected' | 'history'>('book');
+
+  // Patient Booking Modal States
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingDoctor, setBookingDoctor] = useState<any>(null);
+  const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [bookingTime, setBookingTime] = useState<string>('');
+  const [bookingType, setBookingType] = useState<ConsultationType>('video');
+  const [bookingReason, setBookingReason] = useState<string>('');
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [bookingFeedbackMessage, setBookingFeedbackMessage] = useState<string | null>(null);
+
+  // Doctor Rejection Modal States
+  const [rejectingAppt, setRejectingAppt] = useState<Appointment | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+  const [isSubmittingDecision, setIsSubmittingDecision] = useState(false);
+
+  // Doctor Availability Management States
+  const [availDate, setAvailDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [availTime, setAvailTime] = useState<string>('09:00');
+  const [availDuration, setAvailDuration] = useState<number>(30);
+  const [availError, setAvailError] = useState<string>('');
+  const [availSuccess, setAvailSuccess] = useState<string>('');
+
+  // Google Calendar & Meet States
   const [syncingApptId, setSyncingApptId] = useState<string | null>(null);
   const [creatingMeetId, setCreatingMeetId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{ [key: string]: { status: 'success' | 'error', message?: string } }>({});
+
+  // 1. Initial Seeding and Sync
+  useEffect(() => {
+    initSeedSlots();
+    loadAllData();
+
+    // Listen for custom cross-component updates
+    const handleApptUpdate = () => loadAllData();
+    const handleSlotUpdate = () => loadAllData();
+    window.addEventListener('raihan_appointments_updated', handleApptUpdate);
+    window.addEventListener('raihan_slots_updated', handleSlotUpdate);
+    window.addEventListener('storage', handleApptUpdate);
+
+    return () => {
+      window.removeEventListener('raihan_appointments_updated', handleApptUpdate);
+      window.removeEventListener('raihan_slots_updated', handleSlotUpdate);
+      window.removeEventListener('storage', handleApptUpdate);
+    };
+  }, [profile?.email, profile?.role]);
+
+  // Firestore realtime sync when configured
+  useEffect(() => {
+    if (!profile?.email || !isFirebaseConfigured) return;
+
+    const field = isDoctor ? 'doctor_email' : 'patient_email';
+    const q = query(
+      collection(db, 'appointments'),
+      where(field, '==', profile.email)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liveList: Appointment[] = [];
+      snapshot.forEach(docSnap => {
+        liveList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      if (liveList.length > 0) {
+        // Merge with local records
+        const local = getLocalAppointments();
+        const mergedMap = new Map<string, Appointment>();
+        local.forEach(a => mergedMap.set(a.id, a));
+        liveList.forEach(a => mergedMap.set(a.id, a));
+        setAppointments(Array.from(mergedMap.values()));
+      }
+    }, (err) => {
+      console.warn("Appointments live sync:", err);
+    });
+
+    return () => unsubscribe();
+  }, [profile?.email, isDoctor]);
+
+  const loadAllData = () => {
+    setIsLoading(true);
+    const localAppts = getLocalAppointments();
+    const localSlots = getLocalSlots();
+
+    // Filter appointments for current user
+    if (profile?.email) {
+      const emailLower = profile.email.toLowerCase().trim();
+      const userAppts = localAppts.filter(a => {
+        if (isDoctor) {
+          return (a.doctor_email || '').toLowerCase().trim() === emailLower;
+        } else {
+          return (a.patient_email || '').toLowerCase().trim() === emailLower;
+        }
+      });
+      setAppointments(userAppts);
+    } else {
+      setAppointments(localAppts);
+    }
+
+    setSlots(localSlots);
+    setIsLoading(false);
+  };
+
+  // ---------------- PATIENT BOOKING ACTIONS ----------------
+
+  const handleOpenBookingModal = (docItem: any) => {
+    setBookingDoctor(docItem);
+    setBookingDate(new Date().toISOString().split('T')[0]);
+    setBookingTime('');
+    setBookingType('video');
+    setBookingReason('');
+    setBookingFeedbackMessage(null);
+    setShowBookingModal(true);
+  };
+
+  const handlePatientSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile?.email || !bookingDoctor || !bookingDate || !bookingTime) return;
+
+    if (!bookingReason.trim()) {
+      alert("Please provide a reason or symptom summary for your consultation.");
+      return;
+    }
+
+    setIsSubmittingBooking(true);
+    try {
+      await requestAppointment({
+        patientEmail: profile.email,
+        patientName: profile.name || (profile.email ? profile.email.split('@')[0] : 'Patient'),
+        patientPhone: profile.phone,
+        patientAge: profile.age,
+        patientGender: profile.gender,
+        patientBloodGroup: profile.bloodGroup,
+        doctorEmail: bookingDoctor.email,
+        doctorName: bookingDoctor.name,
+        doctorSpecialty: bookingDoctor.specialty,
+        doctorImage: bookingDoctor.image,
+        location: bookingDoctor.location || 'Raihan Telemedicine Clinic',
+        date: bookingDate,
+        time: bookingTime,
+        consultationType: bookingType,
+        reason: bookingReason.trim()
+      });
+
+      // Clear modal & switch to Pending Requests Tab
+      setShowBookingModal(false);
+      setPatientActiveTab('pending');
+      setBookingFeedbackMessage(
+        "Your appointment request has been submitted. Please wait for the doctor's approval. You will receive a notification once the doctor responds."
+      );
+      loadAllData();
+    } catch (err) {
+      console.error("Booking error:", err);
+      alert("Failed to submit request. Please try again.");
+    } finally {
+      setIsSubmittingBooking(false);
+    }
+  };
+
+  const handlePatientCancelRequest = async (appId: string) => {
+    const isConfirmed = await confirm({
+      title: 'Withdraw Appointment Request',
+      message: 'Are you sure you want to withdraw this appointment request? The requested time slot will be released.',
+      confirmLabel: 'Yes, Withdraw',
+      cancelLabel: 'Keep Request',
+      severity: 'danger'
+    });
+    if (!isConfirmed) return;
+
+    await cancelAppointment(appId, 'Patient', profile?.email || '');
+    loadAllData();
+  };
+
+  // ---------------- DOCTOR APPROVAL / REJECTION ACTIONS ----------------
+
+  const handleDoctorAccept = async (appId: string) => {
+    setIsSubmittingDecision(true);
+    try {
+      await acceptAppointment(appId);
+      loadAllData();
+    } catch (err) {
+      console.error("Doctor accept error:", err);
+    } finally {
+      setIsSubmittingDecision(false);
+    }
+  };
+
+  const handleOpenRejectModal = (appt: Appointment) => {
+    setRejectingAppt(appt);
+    setRejectionReason('');
+  };
+
+  const handleDoctorConfirmReject = async () => {
+    if (!rejectingAppt) return;
+    setIsSubmittingDecision(true);
+    try {
+      await rejectAppointment(rejectingAppt.id, rejectionReason.trim());
+      setRejectingAppt(null);
+      setRejectionReason('');
+      loadAllData();
+    } catch (err) {
+      console.error("Doctor reject error:", err);
+    } finally {
+      setIsSubmittingDecision(false);
+    }
+  };
+
+  const handleDoctorComplete = async (appId: string) => {
+    await completeAppointment(appId);
+    loadAllData();
+  };
+
+  // ---------------- DOCTOR AVAILABILITY ACTIONS ----------------
+
+  const handleAddSingleSlot = () => {
+    if (!profile?.email || !availDate || !availTime) return;
+    setAvailError('');
+    setAvailSuccess('');
+
+    // Format time to 12-hour
+    const [hStr, mStr] = availTime.split(':');
+    const h = parseInt(hStr, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const formatted = `${h12.toString().padStart(2, '0')}:${mStr} ${ampm}`;
+
+    const res = addDoctorSlot({
+      doctor_email: profile.email,
+      doctor_name: profile.name || 'Doctor',
+      slot_date: availDate,
+      slot_time: formatted,
+      duration: availDuration,
+      is_available: true
+    });
+
+    if (!res.success) {
+      setAvailError(res.error || 'Failed to add slot.');
+    } else {
+      setAvailSuccess(`Slot added for ${formatted} on ${availDate}.`);
+      loadAllData();
+      setTimeout(() => setAvailSuccess(''), 3000);
+    }
+  };
+
+  const handleBatchGenerateSlots = (block: 'morning' | 'afternoon' | 'evening') => {
+    if (!profile?.email || !availDate) return;
+    setAvailError('');
+    setAvailSuccess('');
+
+    let times: string[] = [];
+    if (block === 'morning') {
+      times = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'];
+    } else if (block === 'afternoon') {
+      times = ['02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'];
+    } else {
+      times = ['05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM'];
+    }
+
+    const { added, skipped } = batchAddDoctorSlots({
+      doctorEmail: profile.email,
+      doctorName: profile.name || 'Doctor',
+      date: availDate,
+      times,
+      duration: availDuration
+    });
+
+    setAvailSuccess(`Generated ${added} available slots for ${availDate}${skipped > 0 ? ` (${skipped} existing skipped)` : ''}.`);
+    loadAllData();
+    setTimeout(() => setAvailSuccess(''), 3500);
+  };
+
+  const handleDeleteSlot = async (slotId: string) => {
+    deleteDoctorSlot(slotId);
+    loadAllData();
+  };
+
+  // ---------------- GOOGLE CALENDAR & MEET HELPERS ----------------
 
   const parseAppointmentDateTime = (dateStr: string, timeStr: string): Date => {
     try {
@@ -142,11 +486,8 @@ export default function Appointments() {
       let hours = parseInt(hoursStr, 10);
       const minutes = parseInt(minutesStr, 10);
       
-      if (ampm === 'PM' && hours < 12) {
-        hours += 12;
-      } else if (ampm === 'AM' && hours === 12) {
-        hours = 0;
-      }
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      else if (ampm === 'AM' && hours === 12) hours = 0;
       
       const [year, month, day] = dateStr.split('-').map(num => parseInt(num, 10));
       const parsedDate = new Date();
@@ -154,124 +495,73 @@ export default function Appointments() {
       parsedDate.setHours(hours, minutes, 0, 0);
       return parsedDate;
     } catch (error) {
-      console.error("Error parsing appointment date/time:", error);
       return new Date();
     }
   };
 
-  const handleSyncToGoogleCalendar = async (app: any) => {
+  const handleSyncToGoogleCalendar = async (app: Appointment) => {
     let token = googleToken;
-    
     if (!token) {
-      const confirmAuth = window.confirm("To sync this appointment to your Google Calendar, we need your permission. Connect your Google account?");
+      const confirmAuth = window.confirm("Connect your Google Calendar to export this consultation?");
       if (!confirmAuth) return;
-      
-      try {
-        token = await connectGoogleCalendar();
-        if (!token) {
-          alert("Authentication failed. Please try again.");
-          return;
-        }
-      } catch (authErr) {
-        console.error("Auth error:", authErr);
-        alert("Failed to connect your Google account.");
-        return;
-      }
+      token = await connectGoogleCalendar();
+      if (!token) return;
     }
 
     setSyncingApptId(app.id);
     try {
-      const startDateTime = parseAppointmentDateTime(app.date, app.time);
-      const endDateTime = new Date(startDateTime.getTime() + 30 * 60 * 1000); // 30 mins later
-      
-      const isDoc = profile?.role === 'Doctor';
-      const otherPersonName = isDoc ? app.patientName || app.patientEmail.split('@')[0] : app.doctorName;
-      
-      const summary = isDoc 
-        ? `Raihan Appointment: ${otherPersonName}` 
-        : `Raihan Consultation: Dr. ${otherPersonName}`;
-        
-      const description = `Your telemedicine consultation session.\n\n` +
-        `Patient: ${app.patientName || app.patientEmail}\n` +
-        `Physician: Dr. ${app.doctorName} (${app.doctorSpecialty || ''})\n` +
-        `Clinical Location: ${app.location || 'Raihan Telemedicine Clinic'}\n\n` +
-        `💬 Raihan Portal: ${window.location.origin}/messages\n\n` +
-        `* Please ensure you are logged strictly into your Raihan dashboard.`;
+      const startDateTime = parseAppointmentDateTime(app.appointment_date, app.appointment_time);
+      const endDateTime = new Date(startDateTime.getTime() + (app.duration || 30) * 60 * 1000);
 
-      const eventPayload = {
-        summary: summary,
-        location: app.location || 'Raihan Clinic',
-        description: description,
-        start: {
-          dateTime: startDateTime.toISOString(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        },
-        end: {
-          dateTime: endDateTime.toISOString(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'popup', minutes: 30 },
-            { method: 'email', minutes: 60 }
-          ]
-        }
-      };
+      const otherPerson = isDoctor ? app.patient_name : `Dr. ${app.doctor_name}`;
+      const summary = `Raihan Consultation: ${otherPerson}`;
+      const description = `Telemedicine Session (${app.consultation_type.toUpperCase()})\n` +
+        `Patient: ${app.patient_name} (${app.patient_email})\n` +
+        `Doctor: Dr. ${app.doctor_name} (${app.doctor_specialty})\n` +
+        `Reason: ${app.reason}\n\n` +
+        `Portal URL: ${window.location.origin}/appointments`;
 
-      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(eventPayload)
+        body: JSON.stringify({
+          summary,
+          location: app.location,
+          description,
+          start: { dateTime: startDateTime.toISOString() },
+          end: { dateTime: endDateTime.toISOString() }
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`Google Calendar API responded with status ${response.status}`);
+      if (!res.ok) throw new Error("Google Calendar sync failed.");
+      
+      // Update state locally
+      const all = getLocalAppointments();
+      const target = all.find(a => a.id === app.id);
+      if (target) {
+        target.is_synced_to_calendar = true;
+        saveLocalAppointments(all);
+        loadAllData();
       }
 
-      const eventData = await response.json();
-      
-      await updateDoc(doc(db, 'appointments', app.id), {
-        google_calendar_event_id: eventData.id,
-        is_synced_to_calendar: true
-      });
-
-      setSyncFeedback(prev => ({
-        ...prev,
-        [app.id]: { status: 'success' }
-      }));
-    } catch (err: any) {
-      console.error("Sync error:", err);
-      setSyncFeedback(prev => ({
-        ...prev,
-        [app.id]: { status: 'error', message: err.message || "Failed to add to calendar." }
-      }));
+      setSyncFeedback(prev => ({ ...prev, [app.id]: { status: 'success' } }));
+    } catch (e: any) {
+      setSyncFeedback(prev => ({ ...prev, [app.id]: { status: 'error', message: e.message } }));
     } finally {
       setSyncingApptId(null);
     }
   };
 
-  const handleCreateGoogleMeetSpace = async (app: any) => {
+  const handleCreateGoogleMeet = async (app: Appointment) => {
     let token = googleToken;
-    
     if (!token) {
-      const confirmAuth = window.confirm("To generate a Google Meet space, we need your permission. Connect your Google account?");
+      const confirmAuth = window.confirm("Connect Google account to generate a Meet link?");
       if (!confirmAuth) return;
-      
-      try {
-        token = await connectGoogleCalendar();
-        if (!token) {
-          alert("Authentication failed. Please try again.");
-          return;
-        }
-      } catch (authErr) {
-        console.error("Auth error:", authErr);
-        alert("Failed to connect your Google account.");
-        return;
-      }
+      token = await connectGoogleCalendar();
+      if (!token) return;
     }
 
     setCreatingMeetId(app.id);
@@ -285,321 +575,53 @@ export default function Appointments() {
         body: JSON.stringify({}),
       });
 
-      if (!res.ok) {
-        throw new Error(`Google Meet API responded with status ${res.status}`);
-      }
-
       const data = await res.json();
-      const meetingUri = data.meetingUri;
-      if (!meetingUri) {
-        throw new Error("No meetingUri returned from Google Meet API.");
+      if (data.meetingUri) {
+        const all = getLocalAppointments();
+        const target = all.find(a => a.id === app.id);
+        if (target) {
+          target.google_meet_link = data.meetingUri;
+          saveLocalAppointments(all);
+          loadAllData();
+        }
       }
-
-      await updateDoc(doc(db, 'appointments', app.id), {
-        google_meet_link: meetingUri
-      });
-
-      setSyncFeedback(prev => ({
-        ...prev,
-        [app.id]: { status: 'success' }
-      }));
-    } catch (err: any) {
-      console.error("Error creating Google Meet space:", err);
-      setSyncFeedback(prev => ({
-        ...prev,
-        [app.id]: { status: 'error', message: err.message || "Failed to generate Google Meet link." }
-      }));
+    } catch (e) {
+      console.warn("Meet creation fallback:", e);
     } finally {
       setCreatingMeetId(null);
     }
   };
 
-  useEffect(() => {
-    if (profile?.role !== 'Doctor' || !profile?.email) return;
+  // ---------------- FILTERING LOGIC ----------------
 
-    const q = query(
-      collection(db, 'slots'),
-      where('doctor_email', '==', profile.email)
-    );
+  // Doctor Filtered Appointments
+  const doctorPendingRequests = appointments.filter(a => a.status === 'PENDING');
+  const doctorUpcomingAccepted = appointments.filter(a => a.status === 'ACCEPTED');
+  const doctorCompleted = appointments.filter(a => a.status === 'COMPLETED');
+  const doctorRejected = appointments.filter(a => a.status === 'REJECTED');
+  const doctorHistory = appointments.filter(a => a.status === 'COMPLETED' || a.status === 'CANCELLED' || a.status === 'REJECTED');
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const slots: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const s = docSnap.data();
-        slots.push({
-          id: docSnap.id,
-          doctorEmail: s.doctor_email,
-          doctorName: s.doctor_name,
-          date: s.slot_date,
-          time: s.slot_time,
-          isAvailable: s.is_available
-        });
-      });
-      slots.sort((a, b) => {
-        if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return a.time.localeCompare(b.time);
-      });
-      setDoctorSlots(slots);
-    }, (err) => {
-      console.error("Error listening to doctor slots:", err);
-    });
+  // Patient Filtered Appointments
+  const patientPendingRequests = appointments.filter(a => a.status === 'PENDING');
+  const patientConfirmedVisits = appointments.filter(a => a.status === 'ACCEPTED');
+  const patientRejectedRequests = appointments.filter(a => a.status === 'REJECTED');
+  const patientCompletedVisits = appointments.filter(a => a.status === 'COMPLETED');
+  const patientHistory = appointments.filter(a => a.status === 'COMPLETED' || a.status === 'CANCELLED');
 
-    return () => {
-      unsubscribe();
-    };
-  }, [profile?.email, profile?.role]);
+  // Doctor Slots Filtered
+  const currentDoctorSlots = slots.filter(s => s.doctor_email === profile?.email);
+  const slotsForSelectedAvailDate = currentDoctorSlots.filter(s => s.slot_date === availDate);
 
-  useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', '==', 'Doctor'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setDoctors(list);
-    }, (err) => {
-      console.error("Error fetching doctors list:", err);
-    });
+  // Patient Doctors Directory Filter
+  const filteredDoctors = doctors.filter(docItem => {
+    const matchesSearch = (docItem.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (docItem.specialty || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (docItem.location || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSpecialty = selectedSpecialty === 'All' || docItem.specialty === selectedSpecialty;
+    return matchesSearch && matchesSpecialty;
+  });
 
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!profile?.email) return;
-
-    const field = profile.role === 'Doctor' ? 'doctor_email' : 'patient_email';
-    const q = query(
-      collection(db, 'appointments'),
-      where(field, '==', profile.email)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const appts: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const a = docSnap.data();
-        appts.push({
-          id: docSnap.id,
-          patientEmail: a.patient_email || a.patientEmail,
-          patientName: a.patient_name || a.patientName,
-          doctorEmail: a.doctor_email || a.doctorEmail,
-          doctorName: a.doctor_name || a.doctorName,
-          doctorSpecialty: a.doctor_specialty || a.doctorSpecialty,
-          doctorImage: a.doctor_image || a.doctorImage,
-          location: a.location,
-          date: a.appointment_date || a.date,
-          time: a.appointment_time || a.time,
-          status: a.status,
-          googleCalendarEventId: a.google_calendar_event_id,
-          isSyncedToCalendar: a.is_synced_to_calendar,
-          googleMeetLink: a.google_meet_link,
-          timestamp: a.timestamp
-        });
-      });
-      appts.sort((a, b) => {
-        const dateA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
-        const dateB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
-        return dateB - dateA;
-      });
-      setAppointments(appts);
-      setIsLoading(false);
-    }, (err) => {
-      console.error("Error listening to appointments:", err);
-      setIsLoading(false);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [profile?.email, profile?.role]);
-
-  useEffect(() => {
-    if (!selectedDoctor || !selectedDate || !showBookingModal) {
-      setBookedSlots([]);
-      return;
-    }
-
-    const fetchBookedSlots = async () => {
-      if (!selectedDoctor?.email) {
-        setBookedSlots([]);
-        return;
-      }
-
-      setIsCheckingSlots(true);
-      try {
-        const slotsRef = collection(db, 'slots');
-        const qSlots = query(
-          slotsRef,
-          where('doctor_email', '==', selectedDoctor.email),
-          where('slot_date', '==', selectedDate)
-        );
-        const slotsSnapshot = await getDocs(qSlots);
-
-        const slots: any[] = [];
-        slotsSnapshot.forEach((docSnap) => {
-          const s = docSnap.data();
-          slots.push({
-            id: docSnap.id,
-            doctorEmail: s.doctor_email,
-            doctorName: s.doctor_name,
-            date: s.slot_date,
-            time: s.slot_time,
-            isAvailable: s.is_available
-          });
-        });
-        setAvailableSlots(slots);
-
-        const bookedFromSlots = slots.filter((s: any) => !s.isAvailable).map((s: any) => s.time);
-        
-        let bookedFromApps: string[] = [];
-        try {
-          const qApps = query(
-            collection(db, 'appointments'),
-            where('doctor_email', '==', selectedDoctor.email),
-            where('appointment_date', '==', selectedDate),
-            where('status', '==', 'booked')
-          );
-          const appsSnapshot = await getDocs(qApps);
-          appsSnapshot.forEach((docSnap) => {
-            const a = docSnap.data();
-            const aTime = a.appointment_time || a.time;
-            if (aTime) bookedFromApps.push(aTime);
-          });
-        } catch (appError) {
-          console.warn("Could not fetch appointments for slot check, relying on slots only:", appError);
-        }
-        
-        const allBooked = Array.from(new Set([...bookedFromSlots, ...bookedFromApps]));
-        setBookedSlots(allBooked);
-      } catch (error: any) {
-        console.error("Error fetching slots:", error);
-      } finally {
-        setIsCheckingSlots(false);
-      }
-    };
-
-    fetchBookedSlots();
-  }, [selectedDoctor, selectedDate, showBookingModal]);
-
-  const handleBookAppointment = async () => {
-    const patientEmail = profile?.email || user?.email;
-    if (!patientEmail || !selectedDoctor || !selectedDate || !selectedTime) return;
-
-    setIsBooking(true);
-    try {
-      const doctorEmail = selectedDoctor.email || '';
-      const doctorName = selectedDoctor.name || (doctorEmail ? doctorEmail.split('@')[0] : 'Unknown Doctor');
-      const patientName = profile?.name || (patientEmail ? patientEmail.split('@')[0] : 'Unknown Patient');
-
-      await addDoc(collection(db, 'appointments'), {
-        patient_email: patientEmail,
-        patient_name: patientName,
-        doctor_email: doctorEmail,
-        doctor_name: doctorName,
-        doctor_specialty: selectedDoctor.specialty || 'General Practitioner',
-        doctor_image: selectedDoctor.image || null,
-        location: selectedDoctor.location || 'Raihan Clinic',
-        appointment_date: selectedDate,
-        appointment_time: selectedTime,
-        status: 'booked',
-        timestamp: new Date()
-      });
-
-      try {
-        const slot = availableSlots.find((s: any) => s.time === selectedTime);
-        if (slot) {
-          await updateDoc(doc(db, 'slots', slot.id), {
-            is_available: false,
-            updatedAt: new Date().toISOString()
-          });
-        }
-      } catch (slotError) {
-        console.warn("Failed to mark slot as unavailable:", slotError);
-      }
-
-      setShowBookingModal(false);
-      setSelectedDoctor(null);
-      setSelectedTime('');
-      setShowSuccess(true);
-    } catch (error) {
-      console.error("Error booking appointment:", error);
-    } finally {
-      setIsBooking(false);
-    }
-  };
-
-  const handleUpdateStatus = async (id: string, status: 'completed' | 'cancelled') => {
-    if (status === 'cancelled') {
-      const isConfirmed = await confirm({
-        title: 'Cancel Appointment',
-        message: 'Are you sure you want to cancel this appointment? This action is permanent and cannot be undone.',
-        confirmLabel: 'Yes, Cancel',
-        cancelLabel: 'Keep Appointment',
-        severity: 'danger'
-      });
-      if (!isConfirmed) return;
-    }
-
-    try {
-      await updateDoc(doc(db, 'appointments', id), { status });
-    } catch (error) {
-      console.error("Error updating appointment status:", error);
-    }
-  };
-
-  const handleAddSlot = async () => {
-    if (!profile?.email || !newSlotTime || !newSlotDate) return;
-    
-    const [hours, minutes] = newSlotTime.split(':');
-    const h = parseInt(hours);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    const formattedTime = `${h12.toString().padStart(2, '0')}:${minutes} ${ampm}`;
-
-    setIsAddingSlot(true);
-    try {
-      await addDoc(collection(db, 'slots'), {
-        doctor_email: profile.email,
-        doctor_name: profile.name || profile.email.split('@')[0],
-        slot_date: newSlotDate,
-        slot_time: formattedTime,
-        is_available: true,
-        timestamp: new Date()
-      });
-    } catch (error) {
-      console.error("Error adding slot:", error);
-    } finally {
-      setIsAddingSlot(false);
-    }
-  };
-
-  const handleDeleteSlot = async (id: string) => {
-    const isConfirmed = await confirm({
-      title: 'Delete Appointment Slot',
-      message: 'Are you sure you want to delete this available appointment slot? Patients will no longer be able to book this time.',
-      confirmLabel: 'Yes, Delete',
-      cancelLabel: 'Keep Slot',
-      severity: 'danger'
-    });
-    if (!isConfirmed) return;
-
-    try {
-      await deleteDoc(doc(db, 'slots', id));
-    } catch (error) {
-      console.error("Error deleting slot:", error);
-    }
-  };
-
-  const filteredDoctors = doctors.filter(doc => 
-    (doc.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (doc.specialty || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const upcomingAppointments = appointments.filter(app => app.status === 'booked');
-  const pastAppointments = appointments.filter(app => app.status === 'completed' || app.status === 'cancelled');
-
-  // Calendar Logic
+  // Calendar Days Logic
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart);
@@ -609,7 +631,7 @@ export default function Appointments() {
   const getAppointmentsForDay = (day: Date) => {
     return appointments.filter(app => {
       try {
-        const appDate = parseISO(app.date);
+        const appDate = parseISO(app.appointment_date);
         return isSameDay(appDate, day);
       } catch (e) {
         return false;
@@ -617,76 +639,1047 @@ export default function Appointments() {
     });
   };
 
+  // Slots available for booking modal
+  const bookingDoctorSlots = slots.filter(
+    s => s.doctor_email === bookingDoctor?.email && s.slot_date === bookingDate
+  );
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-12">
+    <div className="max-w-7xl mx-auto space-y-8 pb-16">
+      
+      {/* ---------------- PAGE TOP BAR ---------------- */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black text-slate-800 tracking-tight">Appointments</h1>
-          <p className="text-slate-500 font-medium">Schedule and manage your visits with our top medical specialists.</p>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
+              isDoctor ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
+            )}>
+              {isDoctor ? 'Doctor Schedule Controller' : 'Patient Appointment Portal'}
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">• Role-Based Approval Workflow</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
+            {isDoctor ? 'Appointment Requests & Schedule' : 'Schedule a Consultation'}
+          </h1>
+          <p className="text-slate-500 font-medium text-sm md:text-base">
+            {isDoctor 
+              ? 'Review pending patient consultation requests, approve time slots, and manage your availability.'
+              : 'Select a physician, choose an open clinical slot, and submit an appointment request for doctor approval.'}
+          </p>
         </div>
 
-        <AnimatePresence>
-          {showSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl flex items-center gap-2 text-emerald-700 text-sm font-bold"
+        {/* View Toggles (List vs Calendar) */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-xs">
+            <button
+              onClick={() => setViewMode('list')}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                viewMode === 'list' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+              )}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Appointment booked successfully!
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-          <button
-            onClick={() => setViewMode('list')}
-            className={cn(
-              "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-              viewMode === 'list' ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-50"
-            )}
-          >
-            <LayoutList className="w-4 h-4" />
-            List
-          </button>
-          <button
-            onClick={() => setViewMode('calendar')}
-            className={cn(
-              "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-              viewMode === 'calendar' ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-50"
-            )}
-          >
-            <CalendarDays className="w-4 h-4" />
-            Calendar
-          </button>
-        </div>
-
-        <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-          <button
-            onClick={() => setActiveTab('upcoming')}
-            className={cn(
-              "px-6 py-2 rounded-xl text-sm font-bold transition-all",
-              activeTab === 'upcoming' ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-50"
-            )}
-          >
-            Upcoming
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={cn(
-              "px-6 py-2 rounded-xl text-sm font-bold transition-all",
-              activeTab === 'history' ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-50"
-            )}
-          >
-            History
-          </button>
+              <LayoutList className="w-3.5 h-3.5" />
+              <span>List</span>
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                viewMode === 'calendar' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+              )}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Calendar</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {viewMode === 'calendar' ? (
-        <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-bottom border-slate-100 flex items-center justify-between bg-slate-50/50">
+      {/* Patient Feedback Banner */}
+      <AnimatePresence>
+        {bookingFeedbackMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-5 bg-emerald-50 border border-emerald-200 rounded-3xl flex items-start gap-4 shadow-sm"
+          >
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <h4 className="font-bold text-emerald-900 text-sm">Request Submitted Successfully</h4>
+              <p className="text-emerald-800 text-xs leading-relaxed font-medium">
+                {bookingFeedbackMessage}
+              </p>
+            </div>
+            <button 
+              onClick={() => setBookingFeedbackMessage(null)}
+              className="text-emerald-500 hover:text-emerald-700 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================== */}
+      {/* 1. DOCTOR DASHBOARD VIEW (Role-Based Workflow)                  */}
+      {/* ============================================================== */}
+      {isDoctor && (
+        <div className="space-y-6">
+          
+          {/* Doctor Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+            <button
+              onClick={() => setDoctorActiveTab('requests')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                doctorActiveTab === 'requests' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>Pending Requests</span>
+              {doctorPendingRequests.length > 0 && (
+                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full">
+                  {doctorPendingRequests.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setDoctorActiveTab('upcoming')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                doctorActiveTab === 'upcoming' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Confirmed Visits</span>
+              {doctorUpcomingAccepted.length > 0 && (
+                <span className="px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-full">
+                  {doctorUpcomingAccepted.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setDoctorActiveTab('availability')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                doctorActiveTab === 'availability' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <Stethoscope className="w-4 h-4 text-emerald-600" />
+              <span>Manage Availability Slots</span>
+              <span className="text-[10px] text-slate-400 font-semibold">({currentDoctorSlots.length})</span>
+            </button>
+
+            <button
+              onClick={() => setDoctorActiveTab('history')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                doctorActiveTab === 'history' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <CalendarIcon className="w-4 h-4 text-slate-400" />
+              <span>Consultation History</span>
+            </button>
+          </div>
+
+          {/* TAB 1: DOCTOR PENDING REQUESTS */}
+          {doctorActiveTab === 'requests' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Pending Patient Requests</h3>
+                  <p className="text-xs text-slate-500 font-medium">Review patient symptoms, requested slot, and decide to Approve or Decline.</p>
+                </div>
+                <span className="text-xs font-bold text-slate-500">
+                  {doctorPendingRequests.length} request(s) awaiting your decision
+                </span>
+              </div>
+
+              {doctorPendingRequests.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto">
+                    <CheckCheck className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-base">All Caught Up!</h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    You have no pending appointment requests at this moment. New requests submitted by patients will appear here immediately.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {doctorPendingRequests.map((appt) => (
+                    <motion.div
+                      key={appt.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white p-6 sm:p-7 rounded-[2.5rem] border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-5"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-black text-xl border border-amber-200 shrink-0">
+                            {(appt.patient_name || 'P').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-lg font-black text-slate-800">{appt.patient_name}</h4>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                                ⏳ Pending Approval
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium">{appt.patient_email}</p>
+                            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-600 font-medium">
+                              {appt.patient_age && <span>Age: <strong>{appt.patient_age} yrs</strong></span>}
+                              {appt.patient_gender && <span>Gender: <strong>{appt.patient_gender}</strong></span>}
+                              {appt.patient_blood_group && <span>Blood Group: <strong>{appt.patient_blood_group}</strong></span>}
+                              {appt.patient_phone && <span>Phone: <strong>{appt.patient_phone}</strong></span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Request Date & Time Box */}
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-right space-y-1 shrink-0">
+                          <div className="flex items-center md:justify-end gap-1.5 text-xs font-bold text-slate-800">
+                            <CalendarIcon className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{appt.appointment_date}</span>
+                          </div>
+                          <div className="flex items-center md:justify-end gap-1.5 text-xs font-bold text-slate-600">
+                            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{appt.appointment_time} ({appt.duration || 30} mins)</span>
+                          </div>
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {appt.consultation_type === 'video' ? '🎥 Video Consult' : appt.consultation_type === 'in_person' ? '🏥 In-Person Visit' : '📞 Audio Tele-Consult'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Reason for Consultation */}
+                      <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                          Patient Reason for Consultation
+                        </span>
+                        <p className="text-xs text-slate-700 leading-relaxed font-semibold italic">
+                          "{appt.reason}"
+                        </p>
+                      </div>
+
+                      {/* Doctor Decision Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Submitted: {new Date(appt.created_at || Date.now()).toLocaleString()}
+                        </span>
+
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleOpenRejectModal(appt)}
+                            disabled={isSubmittingDecision}
+                            className="px-5 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>Decline Request</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDoctorAccept(appt.id)}
+                            disabled={isSubmittingDecision}
+                            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-md shadow-emerald-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Approve & Reserve Slot</span>
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: DOCTOR CONFIRMED / UPCOMING VISITS */}
+          {doctorActiveTab === 'upcoming' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Confirmed Patient Consultations</h3>
+                  <p className="text-xs text-slate-500 font-medium">Appointments you have approved and locked in your schedule.</p>
+                </div>
+                <span className="text-xs font-bold text-slate-500">{doctorUpcomingAccepted.length} confirmed</span>
+              </div>
+
+              {doctorUpcomingAccepted.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mx-auto">
+                    <CalendarIcon className="w-8 h-8" />
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-base">No Confirmed Visits Yet</h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    When you accept incoming requests, they will appear here with instant Meet links, Google Calendar sync, and prescription tools.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {doctorUpcomingAccepted.map((appt) => (
+                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-lg border border-emerald-100">
+                            {(appt.patient_name || 'P').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-800 text-sm">{appt.patient_name}</h4>
+                            <p className="text-[11px] text-slate-400">{appt.patient_email}</p>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                          Confirmed
+                        </span>
+                      </div>
+
+                      <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Date & Time</span>
+                          <span className="font-bold text-slate-700">{appt.appointment_date} at {appt.appointment_time}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Consultation Type</span>
+                          <span className="font-bold text-emerald-700 uppercase">{appt.consultation_type.replace('_', ' ')}</span>
+                        </div>
+                        <div className="pt-1 text-[11px] text-slate-600 italic">
+                          "{appt.reason}"
+                        </div>
+                      </div>
+
+                      {/* Doctor Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-2">
+                          {appt.google_meet_link ? (
+                            <a
+                              href={appt.google_meet_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs"
+                            >
+                              <Video className="w-3 h-3" />
+                              <span>Join Meet</span>
+                            </a>
+                          ) : (
+                            <button
+                              onClick={() => handleCreateGoogleMeet(appt)}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1"
+                            >
+                              <Video className="w-3 h-3" />
+                              <span>Meet Link</span>
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleSyncToGoogleCalendar(appt)}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1"
+                          >
+                            <CalendarPlus className="w-3 h-3 text-emerald-600" />
+                            <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Cal'}</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => navigate('/prescriptions', { state: { patientEmail: appt.patient_email, patientName: appt.patient_name } })}
+                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"
+                            title="Write Prescription"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDoctorComplete(appt.id)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold"
+                          >
+                            Complete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: DOCTOR AVAILABILITY SLOT MANAGER */}
+          {doctorActiveTab === 'availability' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Left Column: Slot Generator Form */}
+              <div className="lg:col-span-1 space-y-6">
+                <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-[2.5rem] text-white shadow-xl shadow-emerald-100 space-y-5">
+                  <div className="flex items-center gap-3 border-b border-white/15 pb-3">
+                    <Stethoscope className="w-6 h-6 text-white" />
+                    <div>
+                      <h3 className="font-black text-base">Doctor Availability Manager</h3>
+                      <p className="text-[10px] text-emerald-100 font-semibold">Define your bookable schedule</p>
+                    </div>
+                  </div>
+
+                  {availError && (
+                    <div className="p-3 bg-rose-500/20 border border-rose-300 text-white rounded-xl text-xs font-bold">
+                      {availError}
+                    </div>
+                  )}
+
+                  {availSuccess && (
+                    <div className="p-3 bg-white/20 border border-white/30 text-white rounded-xl text-xs font-bold">
+                      {availSuccess}
+                    </div>
+                  )}
+
+                  <div className="space-y-4 text-xs">
+                    <div className="space-y-1.5">
+                      <label className="font-bold uppercase tracking-wider text-emerald-100">Select Date</label>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={availDate}
+                        onChange={(e) => setAvailDate(e.target.value)}
+                        className="w-full bg-white/15 border border-white/30 rounded-xl p-3 text-white font-bold outline-none focus:bg-white/25"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-bold uppercase tracking-wider text-emerald-100">Session Duration</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[15, 30, 45, 60].map(dur => (
+                          <button
+                            key={dur}
+                            type="button"
+                            onClick={() => setAvailDuration(dur)}
+                            className={cn(
+                              "py-2 rounded-xl font-bold text-xs transition-all cursor-pointer",
+                              availDuration === dur ? "bg-white text-emerald-700 shadow-sm" : "bg-white/10 hover:bg-white/20 text-white"
+                            )}
+                          >
+                            {dur}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <label className="font-bold uppercase tracking-wider text-emerald-100">Add Custom Slot Time</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="time"
+                          value={availTime}
+                          onChange={(e) => setAvailTime(e.target.value)}
+                          className="flex-1 bg-white/15 border border-white/30 rounded-xl p-3 text-white font-bold outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddSingleSlot}
+                          className="px-4 py-3 bg-white text-emerald-700 hover:bg-emerald-50 rounded-xl font-black text-xs shadow-sm flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Add</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Batch Slot Generation */}
+                    <div className="pt-3 border-t border-white/15 space-y-2">
+                      <label className="font-bold uppercase tracking-wider text-emerald-100 block">
+                        Quick Batch Slot Generator
+                      </label>
+                      <div className="grid grid-cols-1 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleBatchGenerateSlots('morning')}
+                          className="w-full p-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-left text-xs transition-all flex items-center justify-between cursor-pointer"
+                        >
+                          <span>🌅 Morning Block (9:00 AM - 12:00 PM)</span>
+                          <span className="text-[10px] opacity-80">+6 slots</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleBatchGenerateSlots('afternoon')}
+                          className="w-full p-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-left text-xs transition-all flex items-center justify-between cursor-pointer"
+                        >
+                          <span>☀️ Afternoon Block (2:00 PM - 5:00 PM)</span>
+                          <span className="text-[10px] opacity-80">+6 slots</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleBatchGenerateSlots('evening')}
+                          className="w-full p-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-left text-xs transition-all flex items-center justify-between cursor-pointer"
+                        >
+                          <span>🌙 Evening Block (5:00 PM - 7:00 PM)</span>
+                          <span className="text-[10px] opacity-80">+4 slots</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Active Slots for Selected Date */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <h4 className="font-black text-slate-800 text-lg">Defined Slots for {availDate}</h4>
+                      <p className="text-xs text-slate-400 font-medium">Patients will choose from these slots when requesting appointments.</p>
+                    </div>
+                    <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+                      {slotsForSelectedAvailDate.length} slot(s)
+                    </span>
+                  </div>
+
+                  {slotsForSelectedAvailDate.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                      <Clock className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-600">No availability slots defined for {availDate}.</p>
+                      <p className="text-[11px] text-slate-400">Use the left panel to generate morning or afternoon slot blocks.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {slotsForSelectedAvailDate.map(slot => (
+                        <div
+                          key={slot.id}
+                          className={cn(
+                            "p-3.5 rounded-2xl border flex items-center justify-between transition-all",
+                            slot.is_available 
+                              ? "bg-slate-50 border-slate-200 text-slate-800" 
+                              : "bg-amber-50/70 border-amber-200 text-amber-900"
+                          )}
+                        >
+                          <div>
+                            <p className="text-xs font-black">{slot.slot_time}</p>
+                            <span className="text-[10px] font-bold text-slate-400">{slot.duration || 30}m</span>
+                            <span className={cn(
+                              "block text-[9px] font-black uppercase tracking-wider mt-0.5",
+                              slot.is_available ? "text-emerald-600" : "text-amber-700"
+                            )}>
+                              {slot.is_available ? '● Available' : '● Reserved'}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSlot(slot.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Slot"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: DOCTOR CONSULTATION HISTORY */}
+          {doctorActiveTab === 'history' && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-black text-slate-800">Completed & Past Appointments</h3>
+              {doctorHistory.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
+                  <p className="text-sm text-slate-400 font-medium">No past appointments recorded.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                  {doctorHistory.map(app => (
+                    <div key={app.id} className="p-4 sm:p-5 flex items-center justify-between text-xs">
+                      <div className="space-y-1">
+                        <p className="font-bold text-slate-800">{app.patient_name} ({app.patient_email})</p>
+                        <p className="text-slate-400">{app.appointment_date} at {app.appointment_time} • {app.consultation_type.toUpperCase()}</p>
+                        {app.rejection_reason && (
+                          <p className="text-rose-600 font-semibold italic text-[11px]">Rejection reason: {app.rejection_reason}</p>
+                        )}
+                      </div>
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                        app.status === 'COMPLETED' ? "bg-slate-100 text-slate-700" :
+                        app.status === 'REJECTED' ? "bg-rose-50 text-rose-700" :
+                        "bg-slate-100 text-slate-500"
+                      )}>
+                        {app.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 2. PATIENT DASHBOARD VIEW (Patient-Initiated Workflow)          */}
+      {/* ============================================================== */}
+      {isPatient && (
+        <div className="space-y-6">
+
+          {/* Patient Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+            <button
+              onClick={() => setPatientActiveTab('book')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                patientActiveTab === 'book' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <Search className="w-4 h-4 text-blue-500" />
+              <span>Find & Book Doctor</span>
+            </button>
+
+            <button
+              onClick={() => setPatientActiveTab('pending')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                patientActiveTab === 'pending' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span>My Pending Requests</span>
+              {patientPendingRequests.length > 0 && (
+                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full">
+                  {patientPendingRequests.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setPatientActiveTab('confirmed')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                patientActiveTab === 'confirmed' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Confirmed Visits</span>
+              {patientConfirmedVisits.length > 0 && (
+                <span className="px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-full">
+                  {patientConfirmedVisits.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setPatientActiveTab('rejected')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                patientActiveTab === 'rejected' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <XCircle className="w-4 h-4 text-rose-500" />
+              <span>Declined Requests</span>
+              {patientRejectedRequests.length > 0 && (
+                <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-black rounded-full">
+                  {patientRejectedRequests.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setPatientActiveTab('history')}
+              className={cn(
+                "px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                patientActiveTab === 'history' 
+                  ? "bg-slate-900 text-white shadow-md" 
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              )}
+            >
+              <History className="w-4 h-4 text-slate-400" />
+              <span>Past Consultations</span>
+            </button>
+          </div>
+
+          {/* TAB 1: PATIENT BROWSE & BOOK DOCTOR */}
+          {patientActiveTab === 'book' && (
+            <div className="space-y-6">
+              
+              {/* Search & Specialty Filter */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search doctor by name, specialty, or clinic location..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all shadow-xs"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {SPECIALTY_FILTERS.map(spec => (
+                    <button
+                      key={spec}
+                      onClick={() => setSelectedSpecialty(spec)}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer",
+                        selectedSpecialty === spec 
+                          ? "bg-emerald-600 text-white shadow-xs" 
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      {spec}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Doctors Directory Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredDoctors.map(docItem => (
+                  <div
+                    key={docItem.id}
+                    className="bg-white p-6 rounded-[2.5rem] border border-slate-200/90 shadow-sm hover:shadow-xl hover:shadow-slate-100 transition-all flex flex-col justify-between space-y-5 group"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-100 shrink-0">
+                          {docItem.image ? (
+                            <img src={docItem.image} alt={docItem.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center font-black text-xl text-slate-400">
+                              {(docItem.name || 'D').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-slate-800 text-base">{docItem.name}</h4>
+                          <p className="text-xs font-bold text-emerald-600">{docItem.specialty}</p>
+                          <p className="text-[11px] text-slate-400 font-medium">{docItem.education || 'Clinical Specialist'}</p>
+                          <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
+                            <Star className="w-3.5 h-3.5 fill-amber-400" />
+                            <span>{docItem.rating || '4.9'}</span>
+                            <span className="text-[10px] text-slate-400">({docItem.reviews || 80}+ reviews)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-50/70 rounded-2xl space-y-1.5 text-xs">
+                        <div className="flex items-center gap-1.5 text-slate-600 font-medium truncate">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{docItem.location}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{docItem.availableHours || '09:00 AM - 05:00 PM'}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                          <span className="text-slate-400 font-semibold">Consultation Fee</span>
+                          <span className="font-black text-slate-800">${docItem.fee || 50}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleOpenBookingModal(docItem)}
+                      className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-md shadow-slate-200 flex items-center justify-center gap-2 cursor-pointer group-hover:bg-emerald-600"
+                    >
+                      <span>Request Appointment</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PATIENT PENDING REQUESTS */}
+          {patientActiveTab === 'pending' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Your Submitted Requests</h3>
+                  <p className="text-xs text-slate-500 font-medium">These requests are awaiting review by your physician.</p>
+                </div>
+                <span className="text-xs font-bold text-slate-500">{patientPendingRequests.length} pending</span>
+              </div>
+
+              {patientPendingRequests.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
+                  <Clock className="w-12 h-12 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-800 text-base">No Pending Requests</h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    You have no active pending requests. Search a doctor to request an appointment.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {patientPendingRequests.map((appt) => (
+                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                            ⏳ Awaiting Doctor Approval
+                          </span>
+                          <h4 className="text-base font-bold text-slate-800 mt-2">Dr. {appt.doctor_name}</h4>
+                          <p className="text-xs text-emerald-600 font-bold">{appt.doctor_specialty}</p>
+                        </div>
+                        <div className="text-right text-xs">
+                          <p className="font-bold text-slate-700">{appt.appointment_date}</p>
+                          <p className="text-slate-400">{appt.appointment_time}</p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-1">
+                        <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Submitted Reason</span>
+                        <p className="text-xs text-slate-700 font-medium italic">"{appt.reason}"</p>
+                      </div>
+
+                      <div className="p-3 bg-slate-50 rounded-xl flex items-center gap-2 text-xs text-slate-500 font-medium">
+                        <Info className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>The doctor will review your request. You will be notified when accepted.</span>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">
+                          {appt.consultation_type.toUpperCase().replace('_', ' ')}
+                        </span>
+                        <button
+                          onClick={() => handlePatientCancelRequest(appt.id)}
+                          className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                        >
+                          Withdraw Request
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: PATIENT CONFIRMED APPOINTMENTS */}
+          {patientActiveTab === 'confirmed' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Confirmed Consultations</h3>
+                  <p className="text-xs text-slate-500 font-medium">Your approved appointments with verified medical specialists.</p>
+                </div>
+                <span className="text-xs font-bold text-slate-500">{patientConfirmedVisits.length} approved</span>
+              </div>
+
+              {patientConfirmedVisits.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-3">
+                  <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-800 text-base">No Confirmed Visits Yet</h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Once a doctor approves your requested appointment, it will appear here with Google Calendar and video link options.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {patientConfirmedVisits.map((appt) => (
+                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-lg border border-emerald-200">
+                            {(appt.doctor_name || 'D').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-800 text-sm">Dr. {appt.doctor_name}</h4>
+                            <p className="text-xs font-bold text-emerald-600">{appt.doctor_specialty}</p>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Approved
+                        </span>
+                      </div>
+
+                      <div className="p-3 bg-slate-50 rounded-2xl space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Date & Time</span>
+                          <span className="font-bold text-slate-800">{appt.appointment_date} at {appt.appointment_time}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Location</span>
+                          <span className="font-bold text-slate-700">{appt.location}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Type</span>
+                          <span className="font-bold text-emerald-700 uppercase">{appt.consultation_type.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-2">
+                          {appt.google_meet_link && (
+                            <a
+                              href={appt.google_meet_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs"
+                            >
+                              <Video className="w-3 h-3" />
+                              <span>Join Meet</span>
+                            </a>
+                          )}
+
+                          <button
+                            onClick={() => handleSyncToGoogleCalendar(appt)}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1"
+                          >
+                            <CalendarPlus className="w-3 h-3 text-emerald-600" />
+                            <span>{appt.is_synced_to_calendar ? 'Synced' : 'Sync Cal'}</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => navigate('/messages', { state: { targetEmail: appt.doctor_email, targetName: `Dr. ${appt.doctor_name}` } })}
+                            className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"
+                            title="Message Doctor"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            onClick={() => navigate('/payments', { state: { appointmentId: appt.id, doctorName: appt.doctor_name, amount: 50 } })}
+                            className="p-2 hover:bg-amber-50 text-amber-600 rounded-lg"
+                            title="Pay Fee"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            onClick={() => handlePatientCancelRequest(appt.id)}
+                            className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: PATIENT DECLINED REQUESTS */}
+          {patientActiveTab === 'rejected' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Declined Consultation Requests</h3>
+                  <p className="text-xs text-slate-500 font-medium">Requests declined by doctors. You can review the reason and book an alternate slot.</p>
+                </div>
+              </div>
+
+              {patientRejectedRequests.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-2">
+                  <p className="text-sm font-bold text-slate-500">No declined requests.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {patientRejectedRequests.map((appt) => (
+                    <div key={appt.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-bold text-slate-800">Dr. {appt.doctor_name}</h4>
+                          <p className="text-xs text-slate-500">{appt.appointment_date} at {appt.appointment_time}</p>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700">
+                          Declined
+                        </span>
+                      </div>
+
+                      <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Doctor Feedback</span>
+                        <p className="text-xs text-rose-900 font-semibold leading-relaxed">
+                          "{appt.rejection_reason || 'Doctor unavailable at the requested time.'}"
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const docMatch = doctors.find(d => d.email === appt.doctor_email) || {
+                            email: appt.doctor_email,
+                            name: `Dr. ${appt.doctor_name}`,
+                            specialty: appt.doctor_specialty,
+                            location: appt.location
+                          };
+                          handleOpenBookingModal(docMatch);
+                        }}
+                        className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Choose Another Time Slot</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: PATIENT PAST VISITS */}
+          {patientActiveTab === 'history' && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-black text-slate-800">Consultation History</h3>
+              {patientHistory.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
+                  <p className="text-sm text-slate-400 font-medium">No past visits recorded.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                  {patientHistory.map(app => (
+                    <div key={app.id} className="p-4 sm:p-5 flex items-center justify-between text-xs">
+                      <div className="space-y-1">
+                        <p className="font-bold text-slate-800">Dr. {app.doctor_name} ({app.doctor_specialty})</p>
+                        <p className="text-slate-400">{app.appointment_date} at {app.appointment_time}</p>
+                      </div>
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                        app.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      )}>
+                        {app.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 3. CALENDAR VIEW MODAL / TAB                                   */}
+      {/* ============================================================== */}
+      {viewMode === 'calendar' && (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-fadeIn">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-black text-slate-800">
                 {format(currentMonth, 'MMMM yyyy')}
@@ -694,13 +1687,13 @@ export default function Appointments() {
               <div className="flex items-center gap-1">
                 <button 
                   onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all"
+                  className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all cursor-pointer"
                 >
                   <ChevronLeft className="w-5 h-5 text-slate-600" />
                 </button>
                 <button 
                   onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all"
+                  className="p-2 hover:bg-white rounded-xl border border-transparent hover:border-slate-200 transition-all cursor-pointer"
                 >
                   <ChevronRight className="w-5 h-5 text-slate-600" />
                 </button>
@@ -708,7 +1701,7 @@ export default function Appointments() {
             </div>
             <button 
               onClick={() => setCurrentMonth(new Date())}
-              className="text-xs font-bold text-emerald-600 hover:text-emerald-700"
+              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer"
             >
               Today
             </button>
@@ -716,9 +1709,9 @@ export default function Appointments() {
 
           <div className="overflow-x-auto custom-scrollbar">
             <div className="min-w-[700px] md:min-w-0">
-              <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800">
+              <div className="grid grid-cols-7 border-b border-slate-100">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="py-3 text-center text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  <div key={day} className="py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     {day}
                   </div>
                 ))}
@@ -734,38 +1727,33 @@ export default function Appointments() {
                     <div 
                       key={day.toString()} 
                       className={cn(
-                        "min-h-[120px] p-2 border-r border-b border-slate-100 dark:border-slate-800 transition-all hover:bg-slate-50/30",
-                        !isCurrentMonth && "bg-slate-50/50 dark:bg-slate-900/20 opacity-40 dark:opacity-25",
+                        "min-h-[110px] p-2 border-r border-b border-slate-100 transition-all hover:bg-slate-50/40",
+                        !isCurrentMonth && "bg-slate-50/50 opacity-40",
                         idx % 7 === 6 && "border-r-0"
                       )}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-1.5">
                         <span className={cn(
                           "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full",
-                          isToday ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-400"
+                          isToday ? "bg-emerald-600 text-white" : "text-slate-600"
                         )}>
                           {format(day, 'd')}
                         </span>
                       </div>
                       <div className="space-y-1">
-                        {dayAppointments.slice(0, 3).map(app => (
+                        {dayAppointments.slice(0, 2).map(app => (
                           <div 
                             key={app.id}
                             className={cn(
                               "text-[9px] p-1.5 rounded-lg border truncate font-bold",
-                              app.status === 'booked' ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/45 text-emerald-700 dark:text-emerald-400" :
-                              app.status === 'completed' ? "bg-slate-50 border-slate-100 dark:bg-slate-800 dark:border-slate-750 text-slate-600 dark:text-slate-400" :
-                              "bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/45 text-rose-700 dark:text-rose-450"
+                              app.status === 'ACCEPTED' ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
+                              app.status === 'PENDING' ? "bg-amber-50 border-amber-200 text-amber-800" :
+                              "bg-slate-50 border-slate-200 text-slate-600"
                             )}
                           >
-                            {app.time} - {app.doctorName}
+                            {app.appointment_time} - {isDoctor ? app.patient_name : app.doctor_name}
                           </div>
                         ))}
-                        {dayAppointments.length > 3 && (
-                          <div className="text-[8px] text-slate-400 dark:text-slate-500 font-bold pl-1">
-                            + {dayAppointments.length - 3} more
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
@@ -774,488 +1762,266 @@ export default function Appointments() {
             </div>
           </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Appointments List */}
-        <div className="lg:col-span-1 space-y-6">
-          {profile?.role === 'Doctor' && (
-            <div className="bg-emerald-600 p-6 rounded-[2.5rem] text-white space-y-4 shadow-xl shadow-emerald-100">
-              <h3 className="text-lg font-bold flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                Add Availability
-              </h3>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest opacity-70">Date</label>
-                  <input 
-                    type="date" 
-                    value={newSlotDate}
-                    onChange={(e) => setNewSlotDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm outline-none focus:bg-white/20 transition-all"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest opacity-70">Time</label>
-                  <input 
-                    type="time" 
-                    value={newSlotTime}
-                    onChange={(e) => setNewSlotTime(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm outline-none focus:bg-white/20 transition-all"
-                  />
-                </div>
-                <button 
-                  onClick={handleAddSlot}
-                  disabled={isAddingSlot}
-                  className="w-full py-2.5 bg-white text-emerald-600 rounded-xl text-sm font-bold hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isAddingSlot ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Add Slot
-                </button>
-              </div>
-            </div>
-          )}
+      )}
 
-          {profile?.role === 'Doctor' && doctorSlots.length > 0 && (
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-emerald-500" />
-                Your Slots
-              </h3>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {doctorSlots.map(slot => (
-                  <div key={slot.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div>
-                      <p className="text-xs font-bold text-slate-700">{slot.date}</p>
-                      <p className="text-[10px] text-slate-500">{slot.time}</p>
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteSlot(slot.id)}
-                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-emerald-500" />
-            Your Schedule
-          </h3>
-          
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 bg-white rounded-3xl border border-slate-100">
-                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-2" />
-                <p className="text-sm text-slate-400">Loading appointments...</p>
-              </div>
-            ) : (activeTab === 'upcoming' ? upcomingAppointments : pastAppointments).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-6 bg-white rounded-3xl border border-slate-100 text-center space-y-3">
-                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
-                  <CalendarIcon className="w-6 h-6" />
-                </div>
-                <p className="text-slate-500 font-medium">No {activeTab} appointments found.</p>
-                {activeTab === 'upcoming' && (
-                  <p className="text-xs text-slate-400">Book your first appointment with one of our specialists.</p>
-                )}
-              </div>
-            ) : (
-              (activeTab === 'upcoming' ? upcomingAppointments : pastAppointments).map((app) => (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  key={app.id}
-                  className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
-                >
-                  <div className="flex gap-4">
-                    <img 
-                      src={app.doctorImage} 
-                      alt={app.doctorName}
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-50"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-slate-800 truncate">
-                        {profile?.role === 'Doctor' ? app.patientEmail.split('@')[0] : app.doctorName}
-                      </h4>
-                      <p className="text-xs text-emerald-600 font-bold">
-                        {profile?.role === 'Doctor' ? 'Patient' : app.doctorSpecialty}
-                      </p>
-                      <div className="mt-2 flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        <span className="flex items-center gap-1">
-                          <CalendarIcon className="w-3 h-3" />
-                          {app.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {app.time}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] text-slate-500 font-medium truncate max-w-[120px]">{app.location}</span>
-                    </div>
-                    <span className={cn(
-                      "text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider",
-                      app.status === 'booked' ? "bg-emerald-50 text-emerald-600" :
-                      app.status === 'completed' ? "bg-slate-100 text-slate-600" :
-                      "bg-rose-50 text-rose-600"
-                    )}>
-                      {app.status}
-                    </span>
-                    {(app.reminder24hSent || app.reminder1hSent) && (
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        <Bell className="w-2.5 h-2.5" />
-                        {app.reminder1hSent ? "1h Reminder Sent" : "24h Reminder Sent"}
-                      </div>
-                    )}
-                    {app.status === 'booked' && (
-                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 ml-2">
-                        {/* Google Meet Connection */}
-                        {app.googleMeetLink ? (
-                          <a
-                            href={app.googleMeetLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded-lg transition-all shadow-sm cursor-pointer"
-                            title="Join Google Meet Room"
-                          >
-                            <Video className="w-3 h-3 text-white" />
-                            <span>Join Meet</span>
-                          </a>
-                        ) : (
-                          <button
-                            onClick={() => handleCreateGoogleMeetSpace(app)}
-                            disabled={creatingMeetId === app.id}
-                            className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 hover:text-blue-800 text-[10px] font-black rounded-lg transition-all"
-                            title="Generate a Google Meet link"
-                          >
-                            {creatingMeetId === app.id ? (
-                              <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
-                            ) : (
-                              <Video className="w-3 h-3 text-blue-500" />
-                            )}
-                            <span>Meet Link</span>
-                          </button>
-                        )}
-
-                        {app.isSyncedToCalendar || app.googleCalendarEventId ? (
-                          <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-lg border border-emerald-100" title="Successfully synced to your Google Calendar">
-                            <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-                            <span>Synced</span>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleSyncToGoogleCalendar(app)}
-                            disabled={syncingApptId === app.id}
-                            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-850 text-[10px] font-black rounded-lg transition-all"
-                            title="Sync Invitation to your Google Calendar"
-                          >
-                            {syncingApptId === app.id ? (
-                              <Loader2 className="w-3 h-3 text-slate-500 animate-spin" />
-                            ) : (
-                              <CalendarPlus className="w-3 h-3 text-emerald-600" />
-                            )}
-                            <span>{syncingApptId === app.id ? 'Syncing...' : 'Sync'}</span>
-                          </button>
-                        )}
-                        {syncFeedback[app.id]?.status === 'error' && (
-                          <span className="text-[8px] text-rose-550 font-bold block" title={syncFeedback[app.id]?.message}>
-                            Error
-                          </span>
-                        )}
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => navigate('/messages', { 
-                              state: { 
-                                targetEmail: profile?.role === 'Doctor' ? app.patientEmail : app.doctorEmail,
-                                targetName: profile?.role === 'Doctor' ? (app.patientName || app.patientEmail.split('@')[0]) : app.doctorName
-                              } 
-                            })}
-                            className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
-                            title="Message"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </button>
-                          {profile?.role === 'Doctor' && (
-                            <button
-                              onClick={() => navigate('/prescriptions', { 
-                                state: { 
-                                  patientEmail: app.patientEmail,
-                                  patientName: app.patientName || app.patientEmail.split('@')[0]
-                                } 
-                              })}
-                              className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                              title="Write Prescription"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {profile?.role !== 'Doctor' && app.status === 'booked' && (
-                            <button
-                              onClick={() => navigate('/payments', { 
-                                state: { 
-                                  appointmentId: app.id,
-                                  doctorName: app.doctorName,
-                                  amount: 50
-                                } 
-                              })}
-                              className="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors"
-                              title="Pay Consultation Fee"
-                            >
-                              <CreditCard className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {profile?.role === 'Doctor' && (
-                            <button
-                              onClick={() => handleUpdateStatus(app.id, 'completed')}
-                              className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
-                            >
-                              Complete
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleUpdateStatus(app.id, 'cancelled')}
-                            className="text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Doctor Search & Booking (Only for Patients) */}
-        {profile?.role !== 'Doctor' && (
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search by doctor name or specialty..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredDoctors.map((doc) => (
-                <motion.div
-                  layoutId={doc.id}
-                  key={doc.id}
-                  className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-100 transition-all group"
-                >
-                  <div className="flex gap-5">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xl border-4 border-white shadow-md overflow-hidden">
-                        {doc.image ? (
-                          <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          (doc.name || 'D').charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="absolute -bottom-2 -right-2 bg-white px-2 py-1 rounded-lg shadow-sm border border-slate-100 flex items-center gap-1">
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <span className="text-[10px] font-black text-slate-700">{doc.rating || '5.0'}</span>
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <h4 className="text-lg font-bold text-slate-800">{doc.name}</h4>
-                      <p className="text-sm font-bold text-emerald-600">{doc.specialty || 'General Practitioner'}</p>
-                      <div className="flex items-center gap-1.5 text-slate-400">
-                        <MapPin className="w-3 h-3" />
-                        <span className="text-xs font-medium">{doc.location || 'Raihan Clinic'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-6 border-t border-slate-50 flex items-center justify-between">
-                    <div className="text-xs text-slate-400 font-medium">
-                      <span className="font-bold text-slate-700">{doc.experience || '10+'}</span> Years Exp.
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedDoctor(doc);
-                        setShowBookingModal(true);
-                      }}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-100"
-                    >
-                      Book Visit
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-
-      {/* Booking Modal */}
+      {/* ============================================================== */}
+      {/* 4. PATIENT APPOINTMENT BOOKING MODAL                           */}
+      {/* ============================================================== */}
       <AnimatePresence>
-        {showBookingModal && selectedDoctor && (
+        {showBookingModal && bookingDoctor && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-8 md:p-12 space-y-8">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
-                      <Plus className="w-6 h-6" />
+              <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 font-bold">
+                    <CalendarPlus className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800">Request Appointment</h3>
+                    <p className="text-xs text-slate-500 font-medium">With {bookingDoctor.name} ({bookingDoctor.specialty})</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBookingModal(false)}
+                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handlePatientSubmitRequest} className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                
+                {/* Step 1: Select Consultation Type */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                    1. Select Consultation Mode
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'video', label: 'Video Consult', icon: Video, desc: 'HD Telehealth' },
+                      { id: 'in_person', label: 'In-Person', icon: Building, desc: 'Clinic Visit' },
+                      { id: 'audio', label: 'Audio Call', icon: Phone, desc: 'Voice Tele-Care' },
+                    ].map(type => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setBookingType(type.id as ConsultationType)}
+                        className={cn(
+                          "p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5",
+                          bookingType === type.id
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm"
+                            : "border-slate-200 hover:border-slate-300 text-slate-600"
+                        )}
+                      >
+                        <type.icon className={cn("w-5 h-5", bookingType === type.id ? "text-emerald-600" : "text-slate-400")} />
+                        <span className="text-xs font-bold block">{type.label}</span>
+                        <span className="text-[10px] text-slate-400 block">{type.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 2: Choose Date & Available Slot */}
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                    2. Select Preferred Date & Available Time Slot
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500">Date</span>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
                     </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-slate-800">Schedule Appointment</h3>
-                      <p className="text-sm text-slate-500 font-medium">Confirm your visit with {selectedDoctor.name}</p>
+
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500">Clinical Location</span>
+                      <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-700 font-medium truncate border border-slate-200">
+                        {bookingDoctor.location}
+                      </div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setShowBookingModal(false);
-                      setSelectedTime('');
-                    }} 
-                    className="p-3 hover:bg-slate-100 rounded-full transition-colors"
+
+                  {/* Slot Pills */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-[11px] font-bold text-slate-500 block">Available Slots for {bookingDate}:</span>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {(bookingDoctorSlots.length > 0 
+                        ? bookingDoctorSlots 
+                        : [
+                            { id: 'def-1', slot_time: '09:00 AM', is_available: true },
+                            { id: 'def-2', slot_time: '10:30 AM', is_available: true },
+                            { id: 'def-3', slot_time: '02:00 PM', is_available: true },
+                            { id: 'def-4', slot_time: '03:30 PM', is_available: true }
+                          ]
+                      ).map((slot: any) => {
+                        const isReserved = !slot.is_available;
+                        const isSelected = bookingTime === slot.slot_time;
+
+                        return (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            disabled={isReserved}
+                            onClick={() => setBookingTime(slot.slot_time)}
+                            className={cn(
+                              "p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center cursor-pointer",
+                              isSelected 
+                                ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200" 
+                                : isReserved 
+                                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60" 
+                                  : "bg-white border-slate-200 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50"
+                            )}
+                          >
+                            <span>{slot.slot_time}</span>
+                            {isReserved && <span className="text-[8px] text-rose-500 font-black uppercase">Booked</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Reason for Consultation */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                    3. Reason for Consultation & Symptoms <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={bookingReason}
+                    onChange={(e) => setBookingReason(e.target.value)}
+                    placeholder="Describe your health symptoms, medical purpose, or specific concerns for this visit..."
+                    className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all resize-none"
+                  />
+                </div>
+
+                {/* Important Notice */}
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Doctor Controlled Approval</span>
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                    Submitting this request does not confirm the appointment. Dr. {bookingDoctor.name} will independently accept or decline your request based on clinical availability. You will receive an immediate notification once reviewed.
+                  </p>
+                </div>
+
+                {/* Submit Request Button */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBooking || !bookingTime}
+                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200 disabled:opacity-50 cursor-pointer"
                   >
-                    <X className="w-6 h-6 text-slate-400" />
+                    {isSubmittingBooking ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Submitting Request...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span>Submit Appointment Request</span>
+                      </>
+                    )}
                   </button>
                 </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Select Date</label>
-                      <div className="relative">
-                        <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input
-                          type="date"
-                          min={new Date().toISOString().split('T')[0]}
-                          value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
-                          className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-slate-700"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Available Slots</label>
-                      {isCheckingSlots ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
-                        </div>
-                      ) : (
-                      <div className="grid grid-cols-2 gap-3">
-                        {availableSlots.length > 0 ? (
-                          availableSlots.map((slot: any) => {
-                            const isBooked = bookedSlots.includes(slot.time);
-                            return (
-                              <button
-                                key={slot.id}
-                                disabled={isBooked}
-                                onClick={() => setSelectedTime(slot.time)}
-                                className={cn(
-                                  "p-4 rounded-2xl border font-bold text-sm transition-all flex items-center justify-center gap-2",
-                                  selectedTime === slot.time 
-                                    ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100" 
-                                    : isBooked
-                                      ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-                                      : "bg-white border-slate-100 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50"
-                                )}
-                              >
-                                <Clock className="w-4 h-4" />
-                                {slot.time}
-                                {isBooked && <span className="text-[8px] ml-1 opacity-60">(Booked)</span>}
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <div className="col-span-2 py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                            <p className="text-xs text-slate-400 font-medium">No slots defined by doctor for this date.</p>
-                          </div>
-                        )}
-                      </div>
-                      )}
-                      {!isCheckingSlots && availableSlots.length > 0 && availableSlots.every((slot: any) => bookedSlots.includes(slot.time)) && (
-                        <p className="text-xs text-rose-500 font-bold text-center mt-2">
-                          All slots are booked for this date.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 p-8 rounded-[2.5rem] space-y-6 border border-slate-100">
-                    <h4 className="font-bold text-slate-800">Appointment Summary</h4>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        {selectedDoctor.image ? (
-                          <img 
-                            src={selectedDoctor.image} 
-                            alt={selectedDoctor.name}
-                            className="w-12 h-12 rounded-xl object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold">
-                            {selectedDoctor.name?.[0]}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">{selectedDoctor.name}</p>
-                          <p className="text-xs text-emerald-600 font-bold">{selectedDoctor.specialty}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">Date</span>
-                          <span className="font-bold text-slate-700">{selectedDate}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">Time</span>
-                          <span className="font-bold text-slate-700">{selectedTime || 'Not selected'}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">Location</span>
-                          <span className="font-bold text-slate-700 text-right max-w-[150px]">{selectedDoctor.location}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={handleBookAppointment}
-                      disabled={!selectedTime || isBooking}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-200 disabled:opacity-50"
-                    >
-                      {isBooking ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="w-5 h-5" />
-                      )}
-                      {isBooking ? 'Confirming...' : 'Confirm Booking'}
-                    </button>
-                  </div>
+      {/* ============================================================== */}
+      {/* 5. DOCTOR REJECTION REASON MODAL                               */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {rejectingAppt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-slate-100"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 font-black">
+                  <XCircle className="w-5 h-5" />
                 </div>
+                <div>
+                  <h4 className="font-bold text-slate-800 text-base">Decline Appointment Request</h4>
+                  <p className="text-xs text-slate-400">Patient: {rejectingAppt.patient_name}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Rejection Reason (will be notified to patient)
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    'Schedule conflict at this hour',
+                    'Please select an afternoon slot',
+                    'Clinical referral required',
+                    'Emergency hospital surgery'
+                  ].map(quickReason => (
+                    <button
+                      key={quickReason}
+                      type="button"
+                      onClick={() => setRejectionReason(quickReason)}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      {quickReason}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Explain why this request is declined or suggest an alternate slot..."
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectingAppt(null)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDoctorConfirmReject}
+                  disabled={isSubmittingDecision}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingDecision ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                  <span>Decline & Release Slot</span>
+                </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

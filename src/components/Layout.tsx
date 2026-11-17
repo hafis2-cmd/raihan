@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Stethoscope, 
@@ -9,23 +9,29 @@ import {
   FileText, 
   CreditCard, 
   Store, 
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Activity,
-  Users,
-  ShieldCheck,
-  MessageSquare,
-  History,
-  Sun,
-  Moon
+  Settings, 
+  LogOut, 
+  Menu, 
+  X, 
+  Activity, 
+  Users, 
+  ShieldCheck, 
+  MessageSquare, 
+  History, 
+  Sun, 
+  Moon,
+  Bell,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import CallNotification from './CallNotification';
+import { getLocalNotifications, markAllNotificationsRead, SystemNotification } from '../services/appointmentService';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -62,9 +68,48 @@ const getNavItems = (role: string, subscribed: boolean) => {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => window.innerWidth >= 768);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, profile, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navItems = getNavItems(profile?.role || 'Patient', profile?.subscribed || false);
+
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Sync notifications
+  const loadNotifications = () => {
+    if (profile?.email) {
+      const list = getLocalNotifications(profile.email);
+      setNotifications(list);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const handleUpdate = () => loadNotifications();
+    window.addEventListener('raihan_notification_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    const interval = setInterval(loadNotifications, 4000);
+    return () => {
+      window.removeEventListener('raihan_notification_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      clearInterval(interval);
+    };
+  }, [profile?.email]);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const handleMarkAllRead = () => {
+    if (profile?.email) {
+      markAllNotificationsRead(profile.email);
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    }
+  };
+
+  const handleNotificationClick = (n: SystemNotification) => {
+    setShowNotifications(false);
+    navigate('/appointments');
+  };
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -207,7 +252,98 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </h1>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Notification Bell with Unread Badge */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-xs cursor-pointer"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center animate-pulse shadow-xs">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-fadeIn">
+                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-emerald-600" />
+                      <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">Notifications</h4>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800">
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-slate-400 font-medium">
+                        No notifications yet.
+                      </div>
+                    ) : (
+                      notifications.slice(0, 10).map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n)}
+                          className={cn(
+                            "p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer text-left space-y-1",
+                            !n.isRead ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={cn(
+                              "text-xs font-bold",
+                              n.type === 'appointment_accepted' ? "text-emerald-600" :
+                              n.type === 'appointment_rejected' ? "text-rose-600" :
+                              n.type === 'appointment_request' ? "text-amber-600" :
+                              "text-slate-700 dark:text-slate-200"
+                            )}>
+                              {n.title}
+                            </span>
+                            <span className="text-[9px] text-slate-400 shrink-0">
+                              {new Date(n.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
+                            {n.message}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 text-center">
+                    <button
+                      onClick={() => {
+                        setShowNotifications(false);
+                        navigate('/appointments');
+                      }}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center justify-center gap-1 w-full cursor-pointer"
+                    >
+                      <span>View All Appointments</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Elegant Global Dark/Light Theme Switching Pin with tooltip */}
             <button
               onClick={toggleTheme}
