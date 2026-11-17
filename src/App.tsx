@@ -42,6 +42,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Dentist-only route guard: prevents patients from accessing dentist-exclusive screens
+const DentistRoute = ({ children }: { children: React.ReactNode }) => {
+  const { profile, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist' || profile?.role === 'Admin';
+  if (!isDentist) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
 // Placeholder components for other pages
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
@@ -70,12 +81,13 @@ function AppRoutes() {
                 <Suspense fallback={<LoadingScreen />}>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/consultations" element={<Consultations />} />
                     <Route path="/appointments" element={<Appointments />} />
                     <Route path="/prescriptions" element={<Prescriptions />} />
                     <Route path="/payments" element={<Payments />} />
-                    <Route path="/patients" element={<Patients />} />
+                    <Route path="/patients" element={<DentistRoute><Patients /></DentistRoute>} />
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/call-history" element={<CallHistory />} />
                   </Routes>

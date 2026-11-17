@@ -8,8 +8,18 @@ import fs from "fs";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import crypto from "crypto";
 import { adminDb } from "./firebase-admin-init";
-import { authMiddleware, AuthenticatedRequest } from "./auth.middleware";
+import { 
+  authMiddleware, 
+  AuthenticatedRequest, 
+  signToken, 
+  verifyToken, 
+  requireDentist, 
+  requirePatient, 
+  requireAdmin, 
+  ADMIN_KEY 
+} from "./auth.middleware";
 import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -106,6 +116,399 @@ async function startServer() {
   // API routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // ==========================================
+  // SERVER USER STORAGE & AUTHENTICATION APIs
+  // ==========================================
+  const USERS_FILE = path.join(process.cwd(), "raihan-server-users.json");
+
+  interface ServerUser {
+    id: string;
+    email: string;
+    passwordHash: string;
+    role: 'Patient' | 'Dentist' | 'Doctor' | 'Admin';
+    name: string;
+    phone?: string;
+    qualification?: string;
+    licenseNumber?: string;
+    specialty?: string;
+    subSpecialty?: string;
+    hospitalAffiliation?: string;
+    consultationFee?: number | string;
+    workingHours?: string;
+    experience?: number;
+    bio?: string;
+    dob?: string;
+    gender?: string;
+    address?: string;
+    dentalHistory?: string;
+    allergies?: string;
+    verified?: boolean;
+    createdAt: string;
+    updatedAt?: string;
+  }
+
+  function loadServerUsers(): ServerUser[] {
+    try {
+      if (fs.existsSync(USERS_FILE)) {
+        return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+      }
+    } catch (e) {
+      console.error("Failed to read server users file:", e);
+    }
+    return [];
+  }
+
+  function saveServerUsers(users: ServerUser[]) {
+    try {
+      fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+    } catch (e) {
+      console.error("Failed to write server users file:", e);
+    }
+  }
+
+  function hashPassword(password: string): string {
+    return crypto.createHmac("sha256", "raihan_dental_salt_2026").update(password).digest("hex");
+  }
+
+  /**
+   * 1. Public Patient-Only Registration Endpoint
+   * Enforces:
+   * - Public users CANNOT register as Dentists (rejected with 403).
+   * - Always assigns the 'Patient' role on the backend.
+   * - Prevents duplicate emails and securely hashes passwords.
+   */
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { name, email, password, phone, dob, gender, role } = req.body;
+
+      // CRITICAL SECURITY RULE: Reject any attempt to register as a Dentist or Doctor
+      if (role && (String(role).toLowerCase() === "dentist" || String(role).toLowerCase() === "doctor")) {
+        return res.status(403).json({
+          error: "Unauthorized: Public registration as a Dentist is not permitted. Dentist accounts must be provisioned by authorized clinic administration."
+        });
+      }
+
+      if (!email || !password || !name) {
+        return res.status(400).json({ error: "Name, email, and password are required fields." });
+      }
+
+      const trimmedEmail = String(email).toLowerCase().trim();
+      if (String(password).length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters long." });
+      }
+
+      // Check for duplicate email registration
+      const users = loadServerUsers();
+      if (users.some(u => u.email.toLowerCase() === trimmedEmail)) {
+        return res.status(409).json({ error: "An account with this email address already exists. Please sign in." });
+      }
+
+      // Force PATIENT role (or Admin only if system administrator email)
+      const assignedRole = trimmedEmail === "cea23csb004@ceattingal.ac.in" ? "Admin" : "Patient";
+      const passwordHash = hashPassword(password);
+
+      const newUser: ServerUser = {
+        id: `user-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+        email: trimmedEmail,
+        passwordHash,
+        role: assignedRole,
+        name: String(name).trim(),
+        phone: phone ? String(phone).trim() : "",
+        dob: dob ? String(dob).trim() : "",
+        gender: gender ? String(gender).trim() : "",
+        verified: true,
+        createdAt: new Date().toISOString()
+      };
+
+      users.push(newUser);
+      saveServerUsers(users);
+
+      // Sync to Firestore if adminDb is configured
+      try {
+        if (adminDb) {
+          await adminDb.collection("users").doc(newUser.id).set({
+            ...newUser,
+            createdAt: new Date()
+          });
+          await adminDb.collection("profiles").doc(newUser.id).set({
+            email: newUser.email,
+            name: newUser.name,
+            role: newUser.role,
+            phone: newUser.phone,
+            dob: newUser.dob,
+            gender: newUser.gender,
+            isOnline: true,
+            createdAt: new Date()
+          });
+        }
+      } catch (e) {
+        console.warn("Firestore sync skipped or unavailable for registration:", e);
+      }
+
+      const token = signToken({
+        id: newUser.id,
+        uid: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Patient account registered successfully",
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          phone: newUser.phone,
+          dob: newUser.dob,
+          gender: newUser.gender
+        },
+        token
+      });
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      return res.status(500).json({ error: "Failed to register account: " + (err.message || String(err)) });
+    }
+  });
+
+  /**
+   * 2. Unified Login Endpoint for Dentists and Patients
+   * Authenticates credentials and resolves actual database role automatically.
+   */
+  app.post("/api/auth/login", (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required." });
+      }
+
+      const trimmedEmail = String(email).toLowerCase().trim();
+      const users = loadServerUsers();
+      const user = users.find(u => u.email.toLowerCase() === trimmedEmail);
+
+      if (!user) {
+        return res.status(401).json({ error: "No registered account found with this email. Please check your credentials or register as a patient." });
+      }
+
+      const expectedHash = hashPassword(password);
+      const legacyHash = Buffer.from(encodeURIComponent(`salt_raihan_${password}`)).toString("base64");
+
+      if (user.passwordHash !== expectedHash && user.passwordHash !== legacyHash) {
+        return res.status(401).json({ error: "Incorrect password. Please verify your credentials and try again." });
+      }
+
+      const token = signToken({
+        id: user.id,
+        uid: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      });
+
+      return res.json({
+        success: true,
+        message: "Authentication successful",
+        role: user.role,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+          specialty: user.specialty,
+          qualification: user.qualification,
+          licenseNumber: user.licenseNumber
+        },
+        token
+      });
+    } catch (err: any) {
+      console.error("Login error:", err);
+      return res.status(500).json({ error: "Internal login failure: " + (err.message || String(err)) });
+    }
+  });
+
+  /**
+   * 3. Authorized Dentist Provisioning Endpoint
+   * Restricted: Requires administrator authorization key or admin token.
+   */
+  app.post("/api/auth/provision-dentist", async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminKey = req.headers["x-admin-key"];
+      const authHeader = req.headers.authorization;
+      let isAuthorized = adminKey === ADMIN_KEY;
+
+      if (!isAuthorized && authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        const user = verifyToken(token);
+        if (user && (user.role === "Admin" || user.email === "cea23csb004@ceattingal.ac.in")) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        return res.status(403).json({
+          error: "Forbidden: Administrator authorization key or admin credentials required to provision dentist accounts."
+        });
+      }
+
+      const {
+        name,
+        email,
+        password,
+        phone,
+        qualification,
+        licenseNumber,
+        specialty,
+        subSpecialty,
+        hospitalAffiliation,
+        consultationFee,
+        workingHours,
+        experience,
+        bio
+      } = req.body;
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: "Dentist name, email, and password are required." });
+      }
+
+      if (!qualification || !licenseNumber) {
+        return res.status(400).json({ error: "Dental qualification (e.g. BDS, MDS) and license/registration number are required." });
+      }
+
+      if (String(password).length < 6) {
+        return res.status(400).json({ error: "Dentist account password must be at least 6 characters long." });
+      }
+
+      const trimmedEmail = String(email).toLowerCase().trim();
+      const users = loadServerUsers();
+      if (users.some(u => u.email.toLowerCase() === trimmedEmail)) {
+        return res.status(409).json({ error: "An account with this email address already exists in the system." });
+      }
+
+      const passwordHash = hashPassword(password);
+      const newDentist: ServerUser = {
+        id: `dentist-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+        email: trimmedEmail,
+        passwordHash,
+        role: "Dentist",
+        name: String(name).trim(),
+        phone: phone ? String(phone).trim() : "",
+        qualification: String(qualification).trim(),
+        licenseNumber: String(licenseNumber).trim(),
+        specialty: specialty || "General Dentistry",
+        subSpecialty: subSpecialty || "",
+        hospitalAffiliation: hospitalAffiliation || "Raihan Dental Clinic",
+        consultationFee: consultationFee || 50,
+        workingHours: workingHours || "09:00 AM - 05:00 PM, Mon-Sat",
+        experience: experience ? Number(experience) : 5,
+        bio: bio || "Licensed Dental Surgeon committed to patient-centered oral healthcare.",
+        verified: true,
+        createdAt: new Date().toISOString()
+      };
+
+      users.push(newDentist);
+      saveServerUsers(users);
+
+      // Sync to Firestore if available
+      try {
+        if (adminDb) {
+          await adminDb.collection("users").doc(newDentist.id).set({
+            ...newDentist,
+            createdAt: new Date()
+          });
+          await adminDb.collection("profiles").doc(newDentist.id).set({
+            email: newDentist.email,
+            name: newDentist.name,
+            role: "Dentist",
+            qualification: newDentist.qualification,
+            licenseNumber: newDentist.licenseNumber,
+            specialty: newDentist.specialty,
+            hospitalAffiliation: newDentist.hospitalAffiliation,
+            consultationFee: newDentist.consultationFee,
+            workingHours: newDentist.workingHours,
+            verified: true,
+            isOnline: true,
+            createdAt: new Date()
+          });
+        }
+      } catch (e) {
+        console.warn("Firestore sync skipped for dentist provisioning:", e);
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: "Dentist account successfully provisioned by clinic administration",
+        dentist: {
+          id: newDentist.id,
+          email: newDentist.email,
+          name: newDentist.name,
+          role: newDentist.role,
+          qualification: newDentist.qualification,
+          licenseNumber: newDentist.licenseNumber,
+          specialty: newDentist.specialty,
+          hospitalAffiliation: newDentist.hospitalAffiliation
+        }
+      });
+    } catch (err: any) {
+      console.error("Dentist provisioning error:", err);
+      return res.status(500).json({ error: "Failed to provision dentist: " + (err.message || String(err)) });
+    }
+  });
+
+  /**
+   * 4. Enforce Role Protection: Non-admins cannot modify account roles
+   */
+  app.post("/api/auth/update-role", authMiddleware, (req: AuthenticatedRequest, res) => {
+    const user = req.user;
+    if (!user || (user.role !== "Admin" && user.email !== "cea23csb004@ceattingal.ac.in")) {
+      return res.status(403).json({
+        error: "Forbidden: Account roles cannot be modified by users. Role adjustments must be authorized by clinic administration."
+      });
+    }
+
+    const { targetEmail, newRole } = req.body;
+    if (!targetEmail || !newRole) {
+      return res.status(400).json({ error: "targetEmail and newRole are required." });
+    }
+
+    const users = loadServerUsers();
+    const target = users.find(u => u.email.toLowerCase() === String(targetEmail).toLowerCase().trim());
+    if (!target) {
+      return res.status(404).json({ error: "Target user not found." });
+    }
+
+    target.role = newRole;
+    target.updatedAt = new Date().toISOString();
+    saveServerUsers(users);
+
+    return res.json({ success: true, message: `Role updated to ${newRole} for ${targetEmail}` });
+  });
+
+  /**
+   * 5. Dentist-Only Protected Endpoint: Patient Directory
+   * Enforces: Patients cannot access confidential patient directory
+   */
+  app.get("/api/dentist/patients", authMiddleware, requireDentist, (req: AuthenticatedRequest, res) => {
+    const users = loadServerUsers();
+    const patients = users
+      .filter(u => u.role === "Patient")
+      .map(({ passwordHash, ...safeUser }) => safeUser);
+    return res.json({ success: true, count: patients.length, patients });
+  });
+
+  /**
+   * 6. Public Directory of Registered Dentists (for booking & discovery)
+   */
+  app.get("/api/dentist/list", (req, res) => {
+    const users = loadServerUsers();
+    const dentists = users
+      .filter(u => u.role === "Dentist" || u.role === "Doctor")
+      .map(({ passwordHash, ...safeDentist }) => safeDentist);
+    return res.json({ success: true, count: dentists.length, dentists });
   });
 
   // Enforce JWT verification for all Gemini API endpoints

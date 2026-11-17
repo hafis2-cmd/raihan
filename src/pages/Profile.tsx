@@ -166,7 +166,7 @@ export default function Profile() {
       const updateData: Partial<UserProfile> = {
         name: formData.name,
         phone: formData.phone,
-        role: (formData.role || profile?.role || 'Patient') as any,
+        role: (profile?.role || 'Patient') as any, // Role is locked and cannot be changed by profile edits
         image: formData.image,
         photoURL: formData.image,
         newsletter: formData.newsletter,

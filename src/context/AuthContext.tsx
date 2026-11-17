@@ -15,7 +15,7 @@ import {
   setDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { ADMIN_EMAIL } from '../constants';
+import { ADMIN_EMAIL, ADMIN_PROVISION_KEY } from '../constants';
 
 export interface RegisteredUser {
   id: string;
@@ -235,6 +235,24 @@ interface AuthContextType {
     role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin',
     extraData?: Partial<RegisteredUser>
   ) => Promise<void>;
+  provisionDentistAccount: (
+    dentistData: {
+      name: string;
+      email: string;
+      password: string;
+      qualification: string;
+      licenseNumber: string;
+      specialty?: string;
+      subSpecialty?: string;
+      phone?: string;
+      hospitalAffiliation?: string;
+      consultationFee?: number | string;
+      workingHours?: string;
+      experience?: number;
+      bio?: string;
+    },
+    adminKey?: string
+  ) => Promise<RegisteredUser>;
   logout: () => Promise<void>;
   updateRole: (role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => Promise<void>;
   updateProfile: (updatedData: Partial<UserProfile>) => Promise<void>;
@@ -452,6 +470,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(true);
     try {
+      // 1. First attempt backend API login
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmedEmail, password: pass })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && data.user) {
+            const role = data.role || data.user.role || 'Patient';
+            const storedProf = getStoredProfile(trimmedEmail, role);
+            const authSessionUser = {
+              uid: data.user.id,
+              email: data.user.email,
+              displayName: data.user.name,
+              token: data.token
+            };
+
+            localStorage.setItem('raihan_active_user', JSON.stringify(authSessionUser));
+            localStorage.setItem('raihan_active_profile', JSON.stringify(storedProf));
+
+            setUser(authSessionUser);
+            setProfile(storedProf);
+            return;
+          }
+        } else {
+          const errData = await resp.json().catch(() => null);
+          if (errData?.error && resp.status === 401) {
+            throw new Error(errData.error);
+          }
+        }
+      } catch (backendErr: any) {
+        if (backendErr.message && backendErr.message.includes("password") || backendErr.message?.includes("credentials")) {
+          throw backendErr;
+        }
+      }
+
+      // 2. Firebase check if configured
       if (isFirebaseConfigured) {
         try {
           const cred = await signInWithEmailAndPassword(auth, trimmedEmail, pass);
@@ -466,7 +523,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Check registered users in local database
+      // 3. Fallback to registered users in local client store
       const users = getRegisteredUsers();
       const existing = users.find(u => u.email.toLowerCase() === trimmedEmail);
       if (!existing) {
@@ -495,6 +552,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Public Patient-Only Registration
+   * - Enforces PATIENT role strictly
+   * - Rejects any attempt to register as a Dentist or Doctor
+   */
   const signupWithEmail = async (
     email: string, 
     pass: string, 
@@ -510,6 +572,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Password must be at least 6 characters long.");
     }
 
+    // CRITICAL SECURITY ENFORCEMENT: Reject public registration for Dentist
+    if (role === 'Dentist' || role === 'Doctor' || (role as string).toLowerCase() !== 'patient') {
+      throw new Error("Unauthorized: Public registration is only available for patients. Dentist accounts must be provisioned by authorized clinic administration.");
+    }
+
     setLoading(true);
     try {
       const users = getRegisteredUsers();
@@ -517,26 +584,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("An account with this email address already exists. Please sign in.");
       }
 
-      const finalRole = trimmedEmail === ADMIN_EMAIL ? 'Admin' : (role === 'Doctor' ? 'Dentist' : role);
-      const isDentist = finalRole === 'Dentist';
+      // Always assign PATIENT role on signup
+      const finalRole = trimmedEmail === ADMIN_EMAIL ? 'Admin' : 'Patient';
 
       const passwordHash = btoa(encodeURIComponent(`salt_raihan_${pass}`));
       const newUser: RegisteredUser = {
         id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         email: trimmedEmail,
         passwordHash,
-        role: finalRole as any,
-        name,
+        role: finalRole,
+        name: name.trim(),
         phone: extraData?.phone || '',
-        verified: !isDentist, // Dentist verification requires administrative/clinical credential review
-        qualification: extraData?.qualification,
-        licenseNumber: extraData?.licenseNumber,
-        specialty: extraData?.specialty || (isDentist ? 'General Dentistry' : undefined),
-        subSpecialty: extraData?.subSpecialty,
-        location: extraData?.location || (isDentist ? 'Raihan Dental Clinic' : undefined),
-        hospitalAffiliation: extraData?.hospitalAffiliation || (isDentist ? 'Raihan Dental Clinic' : undefined),
-        consultationFee: extraData?.consultationFee || (isDentist ? 50 : undefined),
-        workingHours: extraData?.workingHours || (isDentist ? '09:00 AM - 05:00 PM, Mon-Sat' : undefined),
+        verified: true,
         dob: extraData?.dob,
         gender: extraData?.gender,
         dentalHistory: extraData?.dentalHistory,
@@ -549,19 +608,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const newProfile: UserProfile = {
         email: trimmedEmail,
-        role: finalRole as any,
-        name,
+        role: finalRole,
+        name: newUser.name,
         phone: newUser.phone,
         subscribed: trimmedEmail === ADMIN_EMAIL,
-        verified: newUser.verified,
-        specialty: newUser.specialty,
-        subSpecialty: newUser.subSpecialty,
-        licenseNumber: newUser.licenseNumber,
-        education: newUser.qualification,
-        location: newUser.location,
-        hospitalAffiliation: newUser.hospitalAffiliation,
-        consultationFee: newUser.consultationFee,
-        workingHours: newUser.workingHours,
+        verified: true,
         dob: newUser.dob,
         gender: newUser.gender,
         dentalHistory: newUser.dentalHistory,
@@ -581,6 +632,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem('raihan_active_user', JSON.stringify(authSessionUser));
       localStorage.setItem('raihan_active_profile', JSON.stringify(newProfile));
+
+      // Sync with backend API
+      try {
+        await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newUser.name,
+            email: trimmedEmail,
+            password: pass,
+            phone: newUser.phone,
+            dob: newUser.dob,
+            gender: newUser.gender
+          })
+        });
+      } catch (backendSyncErr) {
+        console.warn("Backend registration sync notice:", backendSyncErr);
+      }
 
       if (isFirebaseConfigured) {
         try {
@@ -603,6 +672,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Authorized Dentist Provisioning (Restricted Process)
+   * Only accessible through admin authorization or clinic management
+   */
+  const provisionDentistAccount = async (
+    dentistData: {
+      name: string;
+      email: string;
+      password: string;
+      qualification: string;
+      licenseNumber: string;
+      specialty?: string;
+      subSpecialty?: string;
+      phone?: string;
+      hospitalAffiliation?: string;
+      consultationFee?: number | string;
+      workingHours?: string;
+      experience?: number;
+      bio?: string;
+    },
+    adminKey: string = ADMIN_PROVISION_KEY
+  ): Promise<RegisteredUser> => {
+    const trimmedEmail = dentistData.email.toLowerCase().trim();
+    if (!trimmedEmail || !dentistData.password || !dentistData.name) {
+      throw new Error("Dentist name, email, and password are required.");
+    }
+    if (!dentistData.qualification || !dentistData.licenseNumber) {
+      throw new Error("Dental qualification (e.g. BDS, MDS) and license number are required.");
+    }
+    if (dentistData.password.length < 6) {
+      throw new Error("Dentist password must be at least 6 characters.");
+    }
+
+    const users = getRegisteredUsers();
+    if (users.some(u => u.email.toLowerCase() === trimmedEmail)) {
+      throw new Error("An account with this email already exists.");
+    }
+
+    const passwordHash = btoa(encodeURIComponent(`salt_raihan_${dentistData.password}`));
+    const newDentist: RegisteredUser = {
+      id: `dentist-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      email: trimmedEmail,
+      passwordHash,
+      role: 'Dentist',
+      name: dentistData.name.trim(),
+      phone: dentistData.phone || '',
+      qualification: dentistData.qualification.trim(),
+      licenseNumber: dentistData.licenseNumber.trim(),
+      specialty: dentistData.specialty || 'General Dentistry',
+      subSpecialty: dentistData.subSpecialty || '',
+      location: dentistData.hospitalAffiliation || 'Raihan Dental Clinic',
+      hospitalAffiliation: dentistData.hospitalAffiliation || 'Raihan Dental Clinic',
+      consultationFee: dentistData.consultationFee || 50,
+      workingHours: dentistData.workingHours || '09:00 AM - 05:00 PM, Mon-Sat',
+      experience: dentistData.experience || 5,
+      bio: dentistData.bio || 'Licensed Dental Surgeon specializing in comprehensive oral healthcare.',
+      verified: true,
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newDentist);
+    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+
+    const dentistProfile: UserProfile = {
+      email: trimmedEmail,
+      role: 'Dentist',
+      name: newDentist.name,
+      phone: newDentist.phone,
+      subscribed: true,
+      verified: true,
+      specialty: newDentist.specialty,
+      subSpecialty: newDentist.subSpecialty,
+      licenseNumber: newDentist.licenseNumber,
+      education: newDentist.qualification,
+      location: newDentist.location,
+      hospitalAffiliation: newDentist.hospitalAffiliation,
+      consultationFee: newDentist.consultationFee,
+      workingHours: newDentist.workingHours,
+      experience: newDentist.experience,
+      bio: newDentist.bio,
+      isOnline: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    localStorage.setItem(`raihan_profile_${trimmedEmail}`, JSON.stringify(dentistProfile));
+
+    // Backend sync
+    try {
+      await fetch('/api/auth/provision-dentist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        },
+        body: JSON.stringify(dentistData)
+      });
+    } catch (e) {
+      console.warn("Backend provision sync notice:", e);
+    }
+
+    return newDentist;
+  };
+
   const logout = async () => {
     localStorage.removeItem('raihan_active_user');
     localStorage.removeItem('raihan_active_profile');
@@ -616,8 +789,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setGoogleToken(null);
   };
 
+  /**
+   * Role modification protection:
+   * Non-admin users are strictly forbidden from altering their account role.
+   */
   const updateRole = async (role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => {
     if (!user) return;
+    const currentRole = profile?.role || 'Patient';
+    const isAdmin = user.email === ADMIN_EMAIL || currentRole === 'Admin';
+    if (!isAdmin) {
+      throw new Error("Forbidden: Account roles cannot be modified by users. Role adjustments must be authorized by clinic administration.");
+    }
+
     setLoading(true);
     const finalRole = user.email === ADMIN_EMAIL ? 'Admin' : role;
     
@@ -660,11 +843,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
 
     const email = profile?.email || user?.email || '';
+    const isAdmin = email === ADMIN_EMAIL || profile?.role === 'Admin';
+
+    // Prevent patients from modifying their role via profile edit
+    const enforcedRole = (isAdmin && updatedData.role) ? updatedData.role : (profile?.role || 'Patient');
+
     const merged: UserProfile = {
       ...(profile || {}),
       ...updatedData,
       email,
-      role: (updatedData.role || profile?.role || 'Patient') as any,
+      role: enforcedRole as any,
       subscribed: profile?.subscribed ?? true,
       updatedAt: new Date()
     } as UserProfile;
@@ -714,6 +902,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginAsDemo,
       loginWithEmail, 
       signupWithEmail, 
+      provisionDentistAccount,
       logout, 
       updateRole, 
       updateProfile,

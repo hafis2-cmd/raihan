@@ -57,6 +57,13 @@ export default function Patients() {
 
   const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist';
 
+  // Guard: Immediately redirect non-dentists away from patient records
+  useEffect(() => {
+    if (profile && !isDentist && profile.role !== 'Admin') {
+      navigate('/');
+    }
+  }, [profile, isDentist, navigate]);
+
   const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
