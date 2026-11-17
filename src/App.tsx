@@ -18,7 +18,6 @@ const Prescriptions = lazy(() => import('./pages/Prescriptions'));
 const Payments = lazy(() => import('./pages/Payments'));
 const Patients = lazy(() => import('./pages/Patients'));
 const Messages = lazy(() => import('./pages/Messages'));
-const CallHistory = lazy(() => import('./pages/CallHistory'));
 const Login = lazy(() => import('./pages/Login'));
 
 const LoadingScreen = () => (
@@ -89,7 +88,6 @@ function AppRoutes() {
                     <Route path="/payments" element={<Payments />} />
                     <Route path="/patients" element={<DentistRoute><Patients /></DentistRoute>} />
                     <Route path="/messages" element={<Messages />} />
-                    <Route path="/call-history" element={<CallHistory />} />
                   </Routes>
                 </Suspense>
               </Layout>

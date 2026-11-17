@@ -812,7 +812,7 @@ export default function Appointments() {
                   </div>
                   <h4 className="font-bold text-slate-800 text-base">No Confirmed Visits Yet</h4>
                   <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    When you accept incoming requests, they will appear here with instant Meet links, Google Calendar sync, and prescription tools.
+                    When you accept incoming requests, they will appear here with Google Calendar sync, prescription tools, and patient consultation records.
                   </p>
                 </div>
               ) : (
@@ -840,8 +840,8 @@ export default function Appointments() {
                           <span className="font-bold text-slate-700">{appt.appointment_date} at {appt.appointment_time}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Consultation Type</span>
-                          <span className="font-bold text-emerald-700">🏥 On-Site Dental Consultation</span>
+                          <span className="text-slate-400">Visit Location</span>
+                          <span className="font-bold text-slate-700">🏥 Raihan Dental Clinic (On-Site)</span>
                         </div>
                         <div className="pt-1 text-[11px] text-slate-600 italic">
                           "{appt.reason}"
@@ -1307,7 +1307,7 @@ export default function Appointments() {
                             ⏳ Awaiting Doctor Approval
                           </span>
                           <h4 className="text-base font-bold text-slate-800 mt-2">Dr. {appt.doctor_name}</h4>
-                          <p className="text-xs text-emerald-600 font-bold">{appt.doctor_specialty}</p>
+                          <p className="text-xs text-emerald-600 font-bold">Dental Surgeon</p>
                         </div>
                         <div className="text-right text-xs">
                           <p className="font-bold text-slate-700">{appt.appointment_date}</p>
@@ -1322,12 +1322,12 @@ export default function Appointments() {
 
                       <div className="p-3 bg-slate-50 rounded-xl flex items-center gap-2 text-xs text-slate-500 font-medium">
                         <Info className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>The doctor will review your request. You will be notified when accepted.</span>
+                        <span>The dentist will review your request. You will be notified when accepted.</span>
                       </div>
 
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                          🏥 On-Site Clinic Consultation
+                          🏥 On-Site Clinic Visit
                         </span>
                         <button
                           onClick={() => handlePatientCancelRequest(appt.id)}
@@ -1349,7 +1349,7 @@ export default function Appointments() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Confirmed Consultations</h3>
-                  <p className="text-xs text-slate-500 font-medium">Your approved appointments with verified medical specialists.</p>
+                  <p className="text-xs text-slate-500 font-medium">Your approved on-site appointments at Raihan Dental Clinic.</p>
                 </div>
                 <span className="text-xs font-bold text-slate-500">{patientConfirmedVisits.length} approved</span>
               </div>
@@ -1387,11 +1387,11 @@ export default function Appointments() {
                           <span className="font-bold text-slate-800">{appt.appointment_date} at {appt.appointment_time}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Location</span>
-                          <span className="font-bold text-slate-700">{appt.location || 'Raihan Dental Clinic'}</span>
+                          <span className="text-slate-400">Visit Location</span>
+                          <span className="font-bold text-slate-700">{appt.location || 'Raihan Dental Clinic (On-Site)'}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Type</span>
+                          <span className="text-slate-400">Visit Type</span>
                           <span className="font-bold text-emerald-700">🏥 On-Site Dental Consultation</span>
                         </div>
                       </div>
@@ -1509,7 +1509,7 @@ export default function Appointments() {
                   {patientHistory.map(app => (
                     <div key={app.id} className="p-4 sm:p-5 flex items-center justify-between text-xs">
                       <div className="space-y-1">
-                        <p className="font-bold text-slate-800">Dr. {app.doctor_name} ({app.doctor_specialty})</p>
+                        <p className="font-bold text-slate-800">Dr. {app.doctor_name} (Dental Surgeon)</p>
                         <p className="text-slate-400">{app.appointment_date} at {app.appointment_time}</p>
                       </div>
                       <span className={cn(
@@ -1785,9 +1785,9 @@ export default function Appointments() {
                       <span className="font-bold text-slate-800">Dr. {bookingDoctor.name}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Consultation Mode</span>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Visit Type</span>
                       <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] inline-block border border-emerald-200">
-                        🏥 On-Site Clinic Consultation
+                        🏥 On-Site Clinic Visit
                       </span>
                     </div>
                     <div>

@@ -12,7 +12,6 @@ import {
   X, 
   Printer, 
   ChevronRight, 
-  Sparkles,
   Info,
   ShieldCheck,
   AlertCircle,
@@ -38,7 +37,6 @@ export default function Consultations() {
   const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist';
 
   const [consultations, setConsultations] = useState<DentalConsultation[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedConsultation, setSelectedConsultation] = useState<DentalConsultation | null>(null);
@@ -278,13 +276,15 @@ export default function Consultations() {
   };
 
   const filteredConsultations = consultations.filter(c => {
-    const matchesCategory = selectedCategory === 'All' || c.treatment_category === selectedCategory;
-    const matchesSearch = 
-      (c.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.diagnosis || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.treatment_category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.complaints || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (c.patient_name || '').toLowerCase().includes(q) ||
+      (c.diagnosis || '').toLowerCase().includes(q) ||
+      (c.treatment_category || '').toLowerCase().includes(q) ||
+      (c.complaints || '').toLowerCase().includes(q) ||
+      (c.dentist_name || '').toLowerCase().includes(q)
+    );
   });
 
   return (
@@ -320,35 +320,17 @@ export default function Consultations() {
         )}
       </div>
 
-      {/* Search & Category Filter Pills */}
+      {/* Search Bar */}
       <div className="space-y-3">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by patient name, diagnosis, complaints, or procedure..."
+            placeholder="Search consultations by patient name, diagnosis, symptoms, or treatment..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-3.5 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all shadow-xs"
           />
-        </div>
-
-        {/* Treatment Category Filter Pills */}
-        <div className="flex flex-wrap gap-2 pt-1 overflow-x-auto pb-1 custom-scrollbar">
-          {['All', ...DENTAL_TREATMENT_CATEGORIES].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={cn(
-                "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap",
-                selectedCategory === cat 
-                  ? "bg-emerald-600 text-white shadow-xs" 
-                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-              )}
-            >
-              {cat}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -361,7 +343,7 @@ export default function Consultations() {
           <h4 className="font-bold text-slate-800 text-base">No Consultation Records Found</h4>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
             {searchQuery 
-              ? 'No dental consultation records match your filter criteria.' 
+              ? 'No dental consultation records match your search criteria.' 
               : isDentist 
                 ? 'Click "Record Dental Consultation" above to document a patient procedure.'
                 : 'Your dental consultations and treatment history will be displayed here.'}
