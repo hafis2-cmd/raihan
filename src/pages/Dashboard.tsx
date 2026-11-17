@@ -61,9 +61,9 @@ export default function Dashboard() {
     if (profile?.email) {
       const emailLower = profile.email.toLowerCase().trim();
       if (isDentist) {
-        setAppointments(allAppts.filter(a => (a.doctor_email || '').toLowerCase().trim() === emailLower || isDentist));
-        setConsultations(allConsultations.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower || isDentist));
-        setPrescriptions(allPrescriptions.filter(p => (p.dentist_email || '').toLowerCase().trim() === emailLower || isDentist));
+        setAppointments(allAppts.filter(a => (a.doctor_email || '').toLowerCase().trim() === emailLower));
+        setConsultations(allConsultations.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower));
+        setPrescriptions(allPrescriptions.filter(p => (p.dentist_email || '').toLowerCase().trim() === emailLower));
       } else {
         setAppointments(allAppts.filter(a => (a.patient_email || '').toLowerCase().trim() === emailLower));
         setConsultations(allConsultations.filter(c => (c.patient_email || '').toLowerCase().trim() === emailLower));
@@ -96,10 +96,14 @@ export default function Dashboard() {
   const upcomingAppointments = appointments.filter(a => a.status === 'ACCEPTED' && a.appointment_date >= todayStr);
   const uniquePatientEmails = new Set(appointments.map(a => a.patient_email).filter(Boolean));
   consultations.forEach(c => { if (c.patient_email) uniquePatientEmails.add(c.patient_email); });
-  const totalRegisteredPatients = Math.max(uniquePatientEmails.size, 1);
+  const totalRegisteredPatients = uniquePatientEmails.size;
 
   // Patient metrics
-  const nextConfirmedAppointment = appointments.find(a => a.status === 'ACCEPTED' && a.appointment_date >= todayStr);
+  const patientUpcoming = appointments.filter(a => a.status === 'ACCEPTED' && a.appointment_date >= todayStr);
+  const patientPending = appointments.filter(a => a.status === 'PENDING');
+  const patientRxCount = prescriptions.length;
+  const patientRecordCount = consultations.length;
+  const nextConfirmedAppointment = patientUpcoming[0];
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -394,6 +398,53 @@ export default function Dashboard() {
               </Link>
             </div>
           )}
+
+          {/* Patient Overview Metrics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0 border border-emerald-100">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Upcoming Visits</p>
+                <h4 className="text-2xl font-black text-slate-800">{patientUpcoming.length}</h4>
+                <p className="text-[10px] text-emerald-600 font-bold">Confirmed appointments</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 border border-amber-100">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Requests</p>
+                <h4 className="text-2xl font-black text-slate-800">{patientPending.length}</h4>
+                <p className="text-[10px] text-amber-600 font-bold">Awaiting approval</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-100">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Prescriptions</p>
+                <h4 className="text-2xl font-black text-slate-800">{patientRxCount}</h4>
+                <p className="text-[10px] text-indigo-600 font-bold">Active medications</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center shrink-0 border border-teal-100">
+                <Stethoscope className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dental Records</p>
+                <h4 className="text-2xl font-black text-slate-800">{patientRecordCount}</h4>
+                <p className="text-[10px] text-teal-600 font-bold">Clinical visits</p>
+              </div>
+            </div>
+          </div>
 
           {/* Patient Quick Actions */}
           <div className="space-y-3">

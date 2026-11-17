@@ -18,7 +18,7 @@ import {
   AlertCircle,
   FileCheck
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getRegisteredPatients } from '../context/AuthContext';
 import { 
   DentalConsultation, 
   DentalTreatmentCategory, 
@@ -44,8 +44,8 @@ export default function Consultations() {
   const [selectedConsultation, setSelectedConsultation] = useState<DentalConsultation | null>(null);
 
   // Form State for new consultation
-  const [formPatientEmail, setFormPatientEmail] = useState('patient@telemed.com');
-  const [formPatientName, setFormPatientName] = useState('John Doe');
+  const [formPatientEmail, setFormPatientEmail] = useState('');
+  const [formPatientName, setFormPatientName] = useState('');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formCategory, setFormCategory] = useState<DentalTreatmentCategory>('General dental examination');
   const [formComplaints, setFormComplaints] = useState('');
@@ -57,6 +57,8 @@ export default function Consultations() {
   const [formCost, setFormCost] = useState<number>(60);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const registeredPatients = getRegisteredPatients();
+
   // Load consultations
   const loadData = () => {
     const all = getLocalConsultations();
@@ -64,7 +66,7 @@ export default function Consultations() {
       const emailLower = profile.email.toLowerCase().trim();
       if (isDentist) {
         // Dentists see consultations they conducted
-        setConsultations(all.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower || isDentist));
+        setConsultations(all.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower));
       } else {
         // Patients see their own records
         setConsultations(all.filter(c => (c.patient_email || '').toLowerCase().trim() === emailLower));
@@ -136,10 +138,10 @@ export default function Consultations() {
     setIsSubmitting(true);
     try {
       await addDentalConsultation({
-        patient_email: formPatientEmail,
-        patient_name: formPatientName,
-        dentist_email: profile?.email || 'dr.raihan@telemed.com',
-        dentist_name: profile?.name || 'Dr. Raihan (BDS, MDS)',
+        patient_email: formPatientEmail.trim(),
+        patient_name: formPatientName.trim(),
+        dentist_email: profile?.email || '',
+        dentist_name: profile?.name || 'Attending Dentist',
         consultation_date: formDate,
         complaints: formComplaints.trim(),
         examination_findings: formFindings.trim(),
@@ -503,6 +505,28 @@ export default function Consultations() {
 
               <form onSubmit={handleSubmitConsultation} className="p-6 sm:p-8 space-y-5 overflow-y-auto custom-scrollbar flex-1 text-xs">
                 
+                {/* Registered Patient Quick Picker */}
+                {registeredPatients.length > 0 && (
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-600 uppercase tracking-wider">Select Registered Patient</label>
+                    <select
+                      onChange={(e) => {
+                        const found = registeredPatients.find(p => p.email.toLowerCase() === e.target.value.toLowerCase());
+                        if (found) {
+                          setFormPatientName(found.name);
+                          setFormPatientEmail(found.email);
+                        }
+                      }}
+                      className="w-full p-3 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">-- Choose registered patient or enter manually below --</option>
+                      {registeredPatients.map(p => (
+                        <option key={p.email} value={p.email}>{p.name} ({p.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Patient & Date Selection */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -510,6 +534,7 @@ export default function Consultations() {
                     <input
                       type="text"
                       required
+                      placeholder="e.g. Patient Full Name"
                       value={formPatientName}
                       onChange={(e) => setFormPatientName(e.target.value)}
                       className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
@@ -521,6 +546,7 @@ export default function Consultations() {
                     <input
                       type="email"
                       required
+                      placeholder="patient@example.com"
                       value={formPatientEmail}
                       onChange={(e) => setFormPatientEmail(e.target.value)}
                       className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"

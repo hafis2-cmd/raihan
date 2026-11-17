@@ -41,42 +41,6 @@ interface Payment {
   timestamp: any;
 }
 
-const DEFAULT_DENTAL_PAYMENTS: Payment[] = [
-  {
-    id: 'pay-001',
-    patientEmail: 'patient@telemed.com',
-    patientName: 'John Doe',
-    amount: 50,
-    currency: 'USD',
-    status: 'completed',
-    description: 'Dental Consultation & Oral Examination',
-    method: 'Credit Card',
-    timestamp: '2026-11-10T11:30:00Z'
-  },
-  {
-    id: 'pay-002',
-    patientEmail: 'patient@telemed.com',
-    patientName: 'John Doe',
-    amount: 280,
-    currency: 'USD',
-    status: 'completed',
-    description: 'Root Canal Treatment (RCT) – Stage 1',
-    method: 'Digital Payment',
-    timestamp: '2026-11-10T12:00:00Z'
-  },
-  {
-    id: 'pay-003',
-    patientEmail: 'patient@telemed.com',
-    patientName: 'John Doe',
-    amount: 75,
-    currency: 'USD',
-    status: 'pending',
-    description: 'Ultrasonic Dental Scaling (Cleaning)',
-    method: 'Pending Counter Settlement',
-    timestamp: '2026-11-17T09:00:00Z'
-  }
-];
-
 export default function Payments() {
   const { user, profile } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -174,37 +138,60 @@ export default function Payments() {
   useEffect(() => {
     if (!user || !profile) return;
 
-    let q = query(collection(db, 'payments'));
+    const loadLocalPayments = () => {
+      try {
+        const storedRaw = localStorage.getItem('raihan_dental_payments');
+        const list: Payment[] = storedRaw ? JSON.parse(storedRaw) : [];
+        if (profile.role === 'Patient') {
+          return list.filter(p => p.patientEmail.toLowerCase() === user.email?.toLowerCase());
+        }
+        return list;
+      } catch {
+        return [];
+      }
+    };
 
+    setPayments(loadLocalPayments());
+    setLoading(false);
+
+    const handleUpdate = () => {
+      setPayments(loadLocalPayments());
+    };
+    window.addEventListener('raihan_payments_updated', handleUpdate);
+
+    let q = query(collection(db, 'payments'));
     if (profile.role !== 'Admin') {
       q = query(q, where('patientEmail', '==', user.email));
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        list.push({
-          id: docSnap.id,
-          patientEmail: d.patientEmail,
-          patientName: d.patientName,
-          amount: d.amount,
-          currency: d.currency,
-          status: d.status,
-          description: d.description,
-          method: d.method,
-          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp
+      if (!snapshot.empty) {
+        const list: any[] = [];
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            patientEmail: d.patientEmail,
+            patientName: d.patientName,
+            amount: d.amount,
+            currency: d.currency,
+            status: d.status,
+            description: d.description,
+            method: d.method,
+            timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp
+          });
         });
-      });
-      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setPayments(list);
+        list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setPayments(list);
+      }
       setLoading(false);
     }, (err) => {
-      console.error('Error fetching payments:', err);
+      setPayments(loadLocalPayments());
       setLoading(false);
     });
 
     return () => {
+      window.removeEventListener('raihan_payments_updated', handleUpdate);
       unsubscribe();
     };
   }, [user, profile]);
@@ -578,7 +565,7 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
 
       // Save locally
       const storedRaw = localStorage.getItem('raihan_dental_payments');
-      const stored = storedRaw ? JSON.parse(storedRaw) : DEFAULT_DENTAL_PAYMENTS;
+      const stored = storedRaw ? JSON.parse(storedRaw) : [];
       stored.unshift(newPayment);
       localStorage.setItem('raihan_dental_payments', JSON.stringify(stored));
       window.dispatchEvent(new Event('raihan_payments_updated'));

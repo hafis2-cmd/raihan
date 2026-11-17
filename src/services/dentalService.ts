@@ -125,12 +125,12 @@ const STORAGE_KEY_PRESCRIPTIONS = 'raihan_dental_prescriptions';
 export function getLocalConsultations(): DentalConsultation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CONSULTATIONS);
-    if (!raw) return initSeedConsultations();
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : initSeedConsultations();
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     console.warn('Error reading local dental consultations:', e);
-    return initSeedConsultations();
+    return [];
   }
 }
 
@@ -144,51 +144,9 @@ export function saveLocalConsultations(records: DentalConsultation[]) {
   }
 }
 
-// Seed initial consultations if empty
+// Production: No seed consultations
 export function initSeedConsultations(): DentalConsultation[] {
-  const seeds: DentalConsultation[] = [
-    {
-      id: 'cons-seed-1',
-      patient_email: 'patient@telemed.com',
-      patient_name: 'John Doe',
-      dentist_email: 'dr.raihan@telemed.com',
-      dentist_name: 'Dr. Raihan (BDS, MDS)',
-      consultation_date: '2026-11-10',
-      complaints: 'Severe throbbing pain in upper right molar triggered by cold drinks and chewing.',
-      examination_findings: 'Deep occlusal decay on tooth #16 (upper right first molar). Tender to percussion. Vitality test positive for irreversible pulpitis.',
-      diagnosis: 'Acute Irreversible Pulpitis – Tooth #16',
-      treatment_category: 'Root canal treatment',
-      treatment_performed: 'Chemo-mechanical canal debridement, working length determination, and placed Ledermix sedative temporary dressing.',
-      follow_up_instructions: 'Avoid chewing on upper right side. Prescribed antibiotic and analgesic coverage. Return in 7 days for canal obturation.',
-      next_visit_date: '2026-11-20',
-      treatment_cost: 280,
-      created_at: new Date('2026-11-10T11:00:00Z').toISOString()
-    },
-    {
-      id: 'cons-seed-2',
-      patient_email: 'patient@telemed.com',
-      patient_name: 'John Doe',
-      dentist_email: 'dr.raihan@telemed.com',
-      dentist_name: 'Dr. Raihan (BDS, MDS)',
-      consultation_date: '2026-10-02',
-      complaints: 'Routine 6-month dental checkup and mild gum bleeding while flossing.',
-      examination_findings: 'Moderate supra-gingival calculus on lingual aspects of lower incisors. Mild generalized marginal gingivitis. No active caries detected.',
-      diagnosis: 'Chronic Marginal Gingivitis with Plaque/Calculus',
-      treatment_category: 'Dental cleaning (Scaling)',
-      treatment_performed: 'Full-mouth ultrasonic scaling and sub-gingival polishing with prophylactic fluoride paste.',
-      follow_up_instructions: 'Brush twice daily using soft-bristled brush, floss daily, and use warm saline rinses for 3 days.',
-      next_visit_date: '2027-04-02',
-      treatment_cost: 75,
-      created_at: new Date('2026-10-02T10:30:00Z').toISOString()
-    }
-  ];
-
-  try {
-    localStorage.setItem(STORAGE_KEY_CONSULTATIONS, JSON.stringify(seeds));
-  } catch (e) {
-    // ignore
-  }
-  return seeds;
+  return [];
 }
 
 // Add a dental consultation
@@ -231,12 +189,12 @@ export async function addDentalConsultation(data: Omit<DentalConsultation, 'id' 
 export function getLocalPrescriptions(): DentalPrescription[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_PRESCRIPTIONS);
-    if (!raw) return initSeedPrescriptions();
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : initSeedPrescriptions();
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     console.warn('Error reading local dental prescriptions:', e);
-    return initSeedPrescriptions();
+    return [];
   }
 }
 
@@ -250,50 +208,9 @@ export function saveLocalPrescriptions(records: DentalPrescription[]) {
   }
 }
 
-// Seed initial dental prescriptions
+// Production: No seed prescriptions
 export function initSeedPrescriptions(): DentalPrescription[] {
-  const seeds: DentalPrescription[] = [
-    {
-      id: 'rx-seed-1',
-      patient_email: 'patient@telemed.com',
-      patient_name: 'John Doe',
-      dentist_email: 'dr.raihan@telemed.com',
-      dentist_name: 'Dr. Raihan (BDS, MDS)',
-      prescription_date: '2026-11-10',
-      medications: [
-        {
-          medicine_name: 'Amoxicillin 500mg',
-          dosage: '500 mg',
-          frequency: '3 times daily (every 8 hrs)',
-          duration: '5 days',
-          instructions: 'Take after meals. Complete full 5-day course.'
-        },
-        {
-          medicine_name: 'Ibuprofen 400mg',
-          dosage: '400 mg',
-          frequency: 'As needed (every 8 hrs)',
-          duration: '3 days',
-          instructions: 'Take with food for pain relief.'
-        },
-        {
-          medicine_name: 'Chlorhexidine 0.2% Mouthwash',
-          dosage: '10 mL',
-          frequency: 'Twice daily',
-          duration: '7 days',
-          instructions: 'Rinse for 1 minute after brushing. Spit out.'
-        }
-      ],
-      instructions: 'Take antibiotics as scheduled to control periapical tooth infection. Maintain gentle oral hygiene around tooth #16.',
-      created_at: new Date('2026-11-10T11:15:00Z').toISOString()
-    }
-  ];
-
-  try {
-    localStorage.setItem(STORAGE_KEY_PRESCRIPTIONS, JSON.stringify(seeds));
-  } catch (e) {
-    // ignore
-  }
-  return seeds;
+  return [];
 }
 
 // Add a dental prescription

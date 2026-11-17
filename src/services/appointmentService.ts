@@ -74,38 +74,9 @@ const APPOINTMENTS_KEY = 'raihan_db_appointments';
 const SLOTS_KEY = 'raihan_db_slots';
 const NOTIFICATIONS_KEY = 'raihan_db_notifications';
 
-// Helper: Seed default slots for demo doctor if storage is empty
-export function initSeedSlots(doctorEmail = 'dr.raihan@telemed.com', doctorName = 'Dr. Raihan (MD)') {
-  const existing = localStorage.getItem(SLOTS_KEY);
-  if (!existing || JSON.parse(existing).length === 0) {
-    const today = new Date();
-    const seeds: DoctorSlot[] = [];
-    
-    for (let offset = 0; offset <= 4; offset++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + offset);
-      const dateStr = d.toISOString().split('T')[0];
-      
-      const times = offset % 2 === 0 
-        ? ['09:00 AM', '10:30 AM', '02:00 PM', '03:30 PM', '04:30 PM']
-        : ['09:30 AM', '11:00 AM', '01:30 PM', '03:00 PM', '05:00 PM'];
-      
-      times.forEach((t, i) => {
-        seeds.push({
-          id: `seed-slot-${offset}-${i}`,
-          doctor_email: doctorEmail,
-          doctor_name: doctorName,
-          slot_date: dateStr,
-          slot_time: t,
-          duration: 30,
-          is_available: true,
-          timestamp: new Date().toISOString()
-        });
-      });
-    }
-
-    localStorage.setItem(SLOTS_KEY, JSON.stringify(seeds));
-  }
+// Production: Do not seed dummy slots. Only slots created by dentists should exist.
+export function initSeedSlots(_doctorEmail?: string, _doctorName?: string) {
+  // Pure no-op in production.
 }
 
 // ---------------- LOCAL STORAGE SYNC HELPERS ----------------

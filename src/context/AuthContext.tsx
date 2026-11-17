@@ -17,11 +17,167 @@ import {
 } from 'firebase/firestore';
 import { ADMIN_EMAIL } from '../constants';
 
+export interface RegisteredUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin';
+  name: string;
+  phone?: string;
+  qualification?: string;
+  licenseNumber?: string;
+  specialty?: string;
+  subSpecialty?: string;
+  location?: string;
+  hospitalAffiliation?: string;
+  consultationFee?: number | string;
+  workingHours?: string;
+  bio?: string;
+  experience?: number;
+  image?: string;
+  age?: number;
+  gender?: 'Male' | 'Female' | 'Other';
+  dob?: string;
+  address?: string;
+  dentalHistory?: string;
+  allergies?: string;
+  verified?: boolean;
+  createdAt: string;
+}
+
+const REGISTERED_USERS_KEY = 'raihan_registered_users';
+
+export function getRegisteredUsers(): RegisteredUser[] {
+  try {
+    const raw = localStorage.getItem(REGISTERED_USERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getRegisteredDentists(): RegisteredUser[] {
+  return getRegisteredUsers().filter(u => u.role === 'Dentist' || u.role === 'Doctor');
+}
+
+export function getRegisteredPatients(): RegisteredUser[] {
+  return getRegisteredUsers().filter(u => u.role === 'Patient');
+}
+
+export function purgeLegacyTestData() {
+  try {
+    // 1. Purge legacy test sessions
+    const activeUser = localStorage.getItem('raihan_active_user');
+    if (activeUser) {
+      try {
+        const u = JSON.parse(activeUser);
+        if (
+          u.email === 'dr.raihan@telemed.com' ||
+          u.email === 'patient@telemed.com' ||
+          u.email === 'dr.sarah@telemed.com' ||
+          (u.uid && String(u.uid).startsWith('demo-'))
+        ) {
+          localStorage.removeItem('raihan_active_user');
+          localStorage.removeItem('raihan_active_profile');
+        }
+      } catch {}
+    }
+
+    // 2. Remove legacy profile keys for test users
+    localStorage.removeItem('raihan_profile_dr.raihan@telemed.com');
+    localStorage.removeItem('raihan_profile_patient@telemed.com');
+    localStorage.removeItem('raihan_profile_dr.sarah@telemed.com');
+    localStorage.removeItem('raihan_profile_dr.michael@telemed.com');
+    localStorage.removeItem('raihan_profile_dr.emily@telemed.com');
+
+    // 3. Purge seed slots
+    const slots = localStorage.getItem('raihan_db_slots');
+    if (slots) {
+      try {
+        const parsed = JSON.parse(slots);
+        const filtered = parsed.filter((s: any) => 
+          !s.id?.startsWith('seed-') && 
+          s.doctor_email !== 'dr.raihan@telemed.com'
+        );
+        localStorage.setItem('raihan_db_slots', JSON.stringify(filtered));
+      } catch {}
+    }
+
+    // 4. Purge seed appointments
+    const appts = localStorage.getItem('raihan_db_appointments');
+    if (appts) {
+      try {
+        const parsed = JSON.parse(appts);
+        const filtered = parsed.filter((a: any) => 
+          a.patient_email !== 'patient@telemed.com' &&
+          a.doctor_email !== 'dr.raihan@telemed.com'
+        );
+        localStorage.setItem('raihan_db_appointments', JSON.stringify(filtered));
+      } catch {}
+    }
+
+    // 5. Purge seed consultations
+    const consults = localStorage.getItem('raihan_dental_consultations');
+    if (consults) {
+      try {
+        const parsed = JSON.parse(consults);
+        const filtered = parsed.filter((c: any) => 
+          !c.id?.startsWith('seed-') && 
+          c.patient_email !== 'patient@telemed.com'
+        );
+        localStorage.setItem('raihan_dental_consultations', JSON.stringify(filtered));
+      } catch {}
+    }
+
+    // 6. Purge seed prescriptions
+    const rxs = localStorage.getItem('raihan_dental_prescriptions');
+    if (rxs) {
+      try {
+        const parsed = JSON.parse(rxs);
+        const filtered = parsed.filter((r: any) => 
+          !r.id?.startsWith('seed-') && 
+          r.patient_email !== 'patient@telemed.com'
+        );
+        localStorage.setItem('raihan_dental_prescriptions', JSON.stringify(filtered));
+      } catch {}
+    }
+
+    // 7. Purge seed payments
+    const payments = localStorage.getItem('raihan_db_payments');
+    if (payments) {
+      try {
+        const parsed = JSON.parse(payments);
+        const filtered = parsed.filter((p: any) => 
+          !p.id?.startsWith('seed-') && 
+          p.patientEmail !== 'patient@telemed.com'
+        );
+        localStorage.setItem('raihan_db_payments', JSON.stringify(filtered));
+      } catch {}
+    }
+
+    // 8. Purge seed notifications
+    const notifs = localStorage.getItem('raihan_db_notifications');
+    if (notifs) {
+      try {
+        const parsed = JSON.parse(notifs);
+        const filtered = parsed.filter((n: any) => 
+          n.recipientEmail !== 'patient@telemed.com' && 
+          n.recipientEmail !== 'dr.raihan@telemed.com'
+        );
+        localStorage.setItem('raihan_db_notifications', JSON.stringify(filtered));
+      } catch {}
+    }
+  } catch (e) {
+    console.warn("Purge test data notice:", e);
+  }
+}
+
 export interface UserProfile {
   email: string;
   role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin';
   subscribed: boolean;
   newsletter?: boolean;
+  verified?: boolean;
   createdAt: any;
   updatedAt?: any;
   name?: string;
@@ -72,7 +228,13 @@ interface AuthContextType {
   login: () => Promise<void>;
   loginAsDemo: (role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin') => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  signupWithEmail: (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => Promise<void>;
+  signupWithEmail: (
+    email: string, 
+    pass: string, 
+    name: string, 
+    role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin',
+    extraData?: Partial<RegisteredUser>
+  ) => Promise<void>;
   logout: () => Promise<void>;
   updateRole: (role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => Promise<void>;
   updateProfile: (updatedData: Partial<UserProfile>) => Promise<void>;
@@ -88,75 +250,22 @@ const getStoredProfile = (email: string, role: 'Doctor' | 'Dentist' | 'Patient' 
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      return { ...parsed, email, role };
+      return { ...parsed, email, role: (role === 'Doctor' ? 'Dentist' : role) as any };
     } catch (e) {
       console.warn("Failed to parse stored profile for", email, e);
     }
   }
 
-  if (role === 'Doctor' || role === 'Dentist') {
-    return {
-      email,
-      role: 'Dentist',
-      name: 'Dr. Raihan (BDS, MDS)',
-      subscribed: true,
-      phone: '+1 (555) 234-5678',
-      specialty: 'Chief Dental Surgeon',
-      subSpecialty: 'Endodontics & Restorative Dentistry',
-      licenseNumber: 'RDC-84920-DEN',
-      education: 'BDS, MDS (Oral & Maxillofacial Surgery)',
-      experience: 12,
-      location: 'Raihan Dental Clinic, Suite 101',
-      hospitalAffiliation: 'Raihan Dental Health Center',
-      consultationFee: 50,
-      workingHours: '09:00 AM - 05:00 PM, Mon-Sat',
-      bio: 'Chief Dental Surgeon with over 12 years of specialized practice in restorative dentistry, root canals, cosmetic smile enhancements, and oral health.',
-      isOnline: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-  } else if (role === 'Patient') {
-    return {
-      email,
-      role: 'Patient',
-      name: 'John Doe',
-      subscribed: true,
-      age: 29,
-      gender: 'Male',
-      dob: '1995-04-12',
-      bloodGroup: 'O+',
-      height: '178 cm',
-      weight: '72 kg',
-      phone: '+1 (555) 876-5432',
-      address: '742 Evergreen Terrace, Sector 4, Metro City',
-      allergies: 'Penicillin (mild), Local Anesthetic (None)',
-      medicalHistory: 'Appendectomy (2018). Occasional seasonal allergy symptoms.',
-      dentalHistory: 'Routine dental scaling 6 months ago. Mild sensitivity on cold beverages.',
-      currentMedications: 'None currently',
-      chronicConditions: 'None reported',
-      emergencyContactName: 'Jane Doe',
-      emergencyContactPhone: '+1 (555) 987-6543',
-      emergencyContactRelation: 'Spouse',
-      insuranceProvider: 'DentalCare Premier',
-      insurancePolicyNumber: 'DC-9948271-X',
-      isOnline: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-  } else {
-    return {
-      email,
-      role: 'Admin',
-      name: 'System Administrator',
-      subscribed: true,
-      phone: '+1 (555) 000-1111',
-      location: 'Raihan Telemedicine Operations Hub',
-      bio: 'Platform & Clinical System Administrator with global operations access.',
-      isOnline: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-  }
+  // Production blank profile (no dummy names or fake credentials)
+  return {
+    email,
+    role: (role === 'Doctor' ? 'Dentist' : role) as any,
+    name: '',
+    subscribed: email === ADMIN_EMAIL,
+    isOnline: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -166,7 +275,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [googleToken, setGoogleToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Check for persisted demo session
+    // Purge any legacy demo or test data before restoring session
+    purgeLegacyTestData();
+
+    // 1. Check for persisted session
     const savedUserJson = localStorage.getItem('raihan_active_user');
     const savedProfileJson = localStorage.getItem('raihan_active_profile');
     if (savedUserJson && savedProfileJson) {
@@ -302,35 +414,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginAsDemo = async (role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin') => {
-    setLoading(true);
-    const isDentistRole = role === 'Doctor' || role === 'Dentist';
-    const email = role === 'Admin' 
-      ? ADMIN_EMAIL 
-      : (isDentistRole ? 'dr.raihan@telemed.com' : 'patient@telemed.com');
-
-    // Retrieve stored profile for this email so previous edits are retained
-    const demoProfile = getStoredProfile(email, isDentistRole ? 'Dentist' : role);
-
-    const demoUser = {
-      uid: `demo-${(isDentistRole ? 'dentist' : role).toLowerCase()}-001`,
-      email,
-      displayName: demoProfile.name || (isDentistRole ? 'Dr. Raihan (BDS, MDS)' : 'John Doe'),
-    };
-
-    localStorage.setItem('raihan_active_user', JSON.stringify(demoUser));
-    localStorage.setItem('raihan_active_profile', JSON.stringify(demoProfile));
-    localStorage.setItem(`raihan_profile_${email.toLowerCase().trim()}`, JSON.stringify(demoProfile));
-
-    setUser(demoUser);
-    setProfile(demoProfile);
-    setLoading(false);
+  const loginAsDemo = async (_role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin') => {
+    throw new Error("Demo accounts have been permanently removed. Please register or sign in with real credentials.");
   };
 
   const login = async () => {
     if (!isFirebaseConfigured) {
-      await loginAsDemo('Doctor');
-      return;
+      throw new Error("Google sign in requires Firebase configuration. Please use Email & Password.");
     }
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
@@ -355,72 +445,159 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
-    if (!isFirebaseConfigured) {
-      const role = email === ADMIN_EMAIL ? 'Admin' : (email.toLowerCase().includes('doc') ? 'Doctor' : 'Patient');
-      await loginAsDemo(role);
-      return;
-    }
-    await signInWithEmailAndPassword(auth, email, pass);
-  };
-
-  const signupWithEmail = async (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Admin') => {
-    if (!isFirebaseConfigured) {
-      setLoading(true);
-      const finalRole = email === ADMIN_EMAIL ? 'Admin' : role;
-      const demoUser = {
-        uid: `demo-${Date.now()}`,
-        email,
-        displayName: name,
-      };
-      const demoProfile: UserProfile = {
-        email,
-        role: finalRole,
-        name,
-        subscribed: email === ADMIN_EMAIL,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      localStorage.setItem('raihan_active_user', JSON.stringify(demoUser));
-      localStorage.setItem('raihan_active_profile', JSON.stringify(demoProfile));
-      setUser(demoUser);
-      setProfile(demoProfile);
-      setLoading(false);
-      return;
+    const trimmedEmail = email.toLowerCase().trim();
+    if (!trimmedEmail || !pass) {
+      throw new Error("Please enter both email and password.");
     }
 
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      const signedUpUser = userCredential.user;
+      if (isFirebaseConfigured) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, trimmedEmail, pass);
+          if (cred.user) {
+            await fetchProfile(cred.user.uid, cred.user);
+            return;
+          }
+        } catch (firebaseErr: any) {
+          if (firebaseErr?.code === 'auth/wrong-password') {
+            throw new Error("Invalid password. Please check your credentials.");
+          }
+        }
+      }
 
-      await firebaseUpdateProfile(signedUpUser, {
-        displayName: name
-      });
+      // Check registered users in local database
+      const users = getRegisteredUsers();
+      const existing = users.find(u => u.email.toLowerCase() === trimmedEmail);
+      if (!existing) {
+        throw new Error("No registered account found with this email. Please register first.");
+      }
 
-      const finalRole = email === ADMIN_EMAIL ? 'Admin' : role;
-      const userDocRef = doc(db, 'users', signedUpUser.uid);
-      
-      const newProfile = {
-        email,
-        role: finalRole,
-        name,
-        subscribed: email === ADMIN_EMAIL,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+      const expectedHash = btoa(encodeURIComponent(`salt_raihan_${pass}`));
+      if (existing.passwordHash !== expectedHash) {
+        throw new Error("Incorrect password. Please verify your credentials and try again.");
+      }
+
+      const storedProf = getStoredProfile(trimmedEmail, existing.role);
+      const authSessionUser = {
+        uid: existing.id,
+        email: existing.email,
+        displayName: existing.name
       };
 
-      await setDoc(userDocRef, newProfile);
+      localStorage.setItem('raihan_active_user', JSON.stringify(authSessionUser));
+      localStorage.setItem('raihan_active_profile', JSON.stringify(storedProf));
 
-      setProfile({
-        email,
+      setUser(authSessionUser);
+      setProfile(storedProf);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signupWithEmail = async (
+    email: string, 
+    pass: string, 
+    name: string, 
+    role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin',
+    extraData?: Partial<RegisteredUser>
+  ) => {
+    const trimmedEmail = email.toLowerCase().trim();
+    if (!trimmedEmail || !pass || !name) {
+      throw new Error("Please fill in all required fields.");
+    }
+    if (pass.length < 6) {
+      throw new Error("Password must be at least 6 characters long.");
+    }
+
+    setLoading(true);
+    try {
+      const users = getRegisteredUsers();
+      if (users.some(u => u.email.toLowerCase() === trimmedEmail)) {
+        throw new Error("An account with this email address already exists. Please sign in.");
+      }
+
+      const finalRole = trimmedEmail === ADMIN_EMAIL ? 'Admin' : (role === 'Doctor' ? 'Dentist' : role);
+      const isDentist = finalRole === 'Dentist';
+
+      const passwordHash = btoa(encodeURIComponent(`salt_raihan_${pass}`));
+      const newUser: RegisteredUser = {
+        id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        email: trimmedEmail,
+        passwordHash,
         role: finalRole as any,
         name,
-        subscribed: email === ADMIN_EMAIL,
-        createdAt: new Date()
-      });
-    } catch (error) {
-      console.error("Signup error:", error);
-      throw error;
+        phone: extraData?.phone || '',
+        verified: !isDentist, // Dentist verification requires administrative/clinical credential review
+        qualification: extraData?.qualification,
+        licenseNumber: extraData?.licenseNumber,
+        specialty: extraData?.specialty || (isDentist ? 'General Dentistry' : undefined),
+        subSpecialty: extraData?.subSpecialty,
+        location: extraData?.location || (isDentist ? 'Raihan Dental Clinic' : undefined),
+        hospitalAffiliation: extraData?.hospitalAffiliation || (isDentist ? 'Raihan Dental Clinic' : undefined),
+        consultationFee: extraData?.consultationFee || (isDentist ? 50 : undefined),
+        workingHours: extraData?.workingHours || (isDentist ? '09:00 AM - 05:00 PM, Mon-Sat' : undefined),
+        dob: extraData?.dob,
+        gender: extraData?.gender,
+        dentalHistory: extraData?.dentalHistory,
+        allergies: extraData?.allergies,
+        createdAt: new Date().toISOString()
+      };
+
+      users.push(newUser);
+      localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+
+      const newProfile: UserProfile = {
+        email: trimmedEmail,
+        role: finalRole as any,
+        name,
+        phone: newUser.phone,
+        subscribed: trimmedEmail === ADMIN_EMAIL,
+        verified: newUser.verified,
+        specialty: newUser.specialty,
+        subSpecialty: newUser.subSpecialty,
+        licenseNumber: newUser.licenseNumber,
+        education: newUser.qualification,
+        location: newUser.location,
+        hospitalAffiliation: newUser.hospitalAffiliation,
+        consultationFee: newUser.consultationFee,
+        workingHours: newUser.workingHours,
+        dob: newUser.dob,
+        gender: newUser.gender,
+        dentalHistory: newUser.dentalHistory,
+        allergies: newUser.allergies,
+        isOnline: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      localStorage.setItem(`raihan_profile_${trimmedEmail}`, JSON.stringify(newProfile));
+
+      const authSessionUser = {
+        uid: newUser.id,
+        email: trimmedEmail,
+        displayName: name
+      };
+
+      localStorage.setItem('raihan_active_user', JSON.stringify(authSessionUser));
+      localStorage.setItem('raihan_active_profile', JSON.stringify(newProfile));
+
+      if (isFirebaseConfigured) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, pass);
+          await firebaseUpdateProfile(userCredential.user, { displayName: name });
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            ...newProfile,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        } catch (firebaseErr) {
+          console.warn("Firebase Auth sync skipped:", firebaseErr);
+        }
+      }
+
+      setUser(authSessionUser);
+      setProfile(newProfile);
     } finally {
       setLoading(false);
     }

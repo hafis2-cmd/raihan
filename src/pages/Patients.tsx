@@ -21,7 +21,7 @@ import {
   CheckCircle2,
   AlertTriangle
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getRegisteredPatients } from '../context/AuthContext';
 import { getLocalAppointments, Appointment } from '../services/appointmentService';
 import { 
   getLocalConsultations, 
@@ -51,58 +51,13 @@ interface PatientRecord {
   totalVisits: number;
 }
 
-const DEFAULT_PATIENTS: PatientRecord[] = [
-  {
-    email: 'patient@telemed.com',
-    name: 'John Doe',
-    phone: '+1 (555) 876-5432',
-    age: 29,
-    gender: 'Male',
-    dob: '1995-04-12',
-    address: '742 Evergreen Terrace, Sector 4, Metro City',
-    bloodGroup: 'O+',
-    allergies: 'Penicillin (mild), Local Anesthetic (None)',
-    dentalHistory: 'Routine dental scaling 6 months ago. Occasional sensitivity to cold drinks on upper right molar.',
-    lastVisit: '2026-11-10',
-    totalVisits: 2
-  },
-  {
-    email: 'sarah.miller@example.com',
-    name: 'Sarah Miller',
-    phone: '+1 (555) 345-6789',
-    age: 34,
-    gender: 'Female',
-    dob: '1990-08-22',
-    address: '104 Park Avenue, Suite 12, Metro City',
-    bloodGroup: 'A+',
-    allergies: 'None reported',
-    dentalHistory: 'Orthodontic braces treatment completed in 2021. Wearing clear night retainer.',
-    lastVisit: '2026-10-15',
-    totalVisits: 3
-  },
-  {
-    email: 'robert.chen@example.com',
-    name: 'Robert Chen',
-    phone: '+1 (555) 456-7890',
-    age: 46,
-    gender: 'Male',
-    dob: '1978-02-14',
-    address: '58 Orchard Lane, Metro City',
-    bloodGroup: 'B+',
-    allergies: 'Aspirin, Ibuprofen (gastric upset)',
-    dentalHistory: 'Composite filling on tooth #25. Smoker for 15 years; prone to coffee/tea stains.',
-    lastVisit: '2026-09-28',
-    totalVisits: 1
-  }
-];
-
 export default function Patients() {
   const { profile } = useAuth();
   const navigate = useNavigate();
 
   const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist';
 
-  const [patients, setPatients] = useState<PatientRecord[]>(DEFAULT_PATIENTS);
+  const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [patientConsultations, setPatientConsultations] = useState<DentalConsultation[]>([]);
@@ -115,9 +70,25 @@ export default function Patients() {
     const allCons = getLocalConsultations();
     const allRx = getLocalPrescriptions();
 
-    // Map of patients
+    // Map of patients (starting empty)
     const patientMap = new Map<string, PatientRecord>();
-    DEFAULT_PATIENTS.forEach(p => patientMap.set(p.email.toLowerCase(), { ...p }));
+
+    // 1. Populate from registered patient accounts
+    const registeredPatients = getRegisteredPatients();
+    registeredPatients.forEach(p => {
+      patientMap.set(p.email.toLowerCase(), {
+        email: p.email,
+        name: p.name,
+        phone: p.phone,
+        age: p.age,
+        gender: p.gender,
+        dob: p.dob,
+        address: p.address,
+        dentalHistory: p.dentalHistory,
+        allergies: p.allergies,
+        totalVisits: 0
+      });
+    });
 
     // Merge from stored profiles
     for (let i = 0; i < localStorage.length; i++) {

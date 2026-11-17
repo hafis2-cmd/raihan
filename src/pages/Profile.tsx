@@ -417,7 +417,7 @@ export default function Profile() {
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-blue-100">Emergency Contact</span>
-                  <span className="font-bold text-right truncate max-w-[130px]">{formData.emergencyContactName || 'Jane Doe'}</span>
+                  <span className="font-bold text-right truncate max-w-[130px]">{formData.emergencyContactName || 'Not Set'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-blue-100">Dental Insurance</span>
@@ -638,7 +638,7 @@ export default function Profile() {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="John Doe"
+                        placeholder="e.g. Patient Full Name"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>

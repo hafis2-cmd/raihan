@@ -99,7 +99,7 @@ export default function Prescriptions() {
     }));
 
     if (isDentistRole) {
-      setPrescriptions(mappedLocal);
+      setPrescriptions(mappedLocal.filter(p => (p.doctorEmail || '').toLowerCase() === (user.email || '').toLowerCase()));
     } else {
       setPrescriptions(mappedLocal.filter(p => (p.patientEmail || '').toLowerCase() === (user.email || '').toLowerCase()));
     }
@@ -631,8 +631,8 @@ function AddPrescriptionModal({ onClose }: { onClose: () => void }) {
       await addDentalPrescription({
         patient_email: formData.patientEmail,
         patient_name: formData.patientName || (formData.patientEmail ? formData.patientEmail.split('@')[0] : 'Patient'),
-        dentist_email: user.email || 'dr.raihan@telemed.com',
-        dentist_name: user.displayName || profile?.name || 'Dr. Raihan (BDS, MDS)',
+        dentist_email: user.email || '',
+        dentist_name: user.displayName || profile?.name || 'Attending Dentist',
         prescription_date: new Date().toISOString().split('T')[0],
         medications: formData.medications.map(m => ({
           medicine_name: m.name,

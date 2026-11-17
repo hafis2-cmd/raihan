@@ -51,7 +51,7 @@ import {
   parseISO
 } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getRegisteredDentists } from '../context/AuthContext';
 import { useConfirmation } from '../context/ConfirmationContext';
 import { db, isFirebaseConfigured } from '../firebase';
 import { 
@@ -87,92 +87,14 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Dental Specialists default catalog
-const DEFAULT_DOCTORS = [
-  {
-    id: 'doc-raihan',
-    email: 'dr.raihan@telemed.com',
-    name: 'Dr. Raihan (BDS, MDS)',
-    specialty: 'Endodontics & Restorative Dentistry',
-    subSpecialty: 'Root Canal Specialist & Smile Makeover',
-    rating: 4.9,
-    reviews: 168,
-    location: 'Raihan Dental Clinic, Suite 101',
-    experience: 12,
-    fee: 50,
-    education: 'BDS, MDS (Oral & Maxillofacial Surgery), FICOI',
-    image: 'https://picsum.photos/seed/raihan-doc/200/200',
-    availableHours: '09:00 AM - 05:00 PM'
-  },
-  {
-    id: 'doc-sarah',
-    email: 'dr.sarah@telemed.com',
-    name: 'Dr. Sarah Jenkins (BDS, MDS)',
-    specialty: 'Orthodontics',
-    subSpecialty: 'Clear Aligners & Dentofacial Orthopedics',
-    rating: 4.9,
-    reviews: 134,
-    location: 'Raihan Dental Clinic, Suite 102',
-    experience: 14,
-    fee: 65,
-    education: 'BDS, MDS (Orthodontics)',
-    image: 'https://picsum.photos/seed/doc1/200/200',
-    availableHours: '09:00 AM - 04:30 PM'
-  },
-  {
-    id: 'doc-michael',
-    email: 'dr.michael@telemed.com',
-    name: 'Dr. Michael Vance (DDS)',
-    specialty: 'Periodontics',
-    subSpecialty: 'Gum Health & Dental Implants',
-    rating: 4.8,
-    reviews: 98,
-    location: 'Raihan Dental Clinic, Suite 103',
-    experience: 10,
-    fee: 55,
-    education: 'DDS, Periodontology Certification',
-    image: 'https://picsum.photos/seed/doc2/200/200',
-    availableHours: '10:00 AM - 05:00 PM'
-  },
-  {
-    id: 'doc-emily',
-    email: 'dr.emily@telemed.com',
-    name: 'Dr. Emily Chen (BDS)',
-    specialty: 'Pediatric Dentistry',
-    subSpecialty: 'Children Oral Care & Preventive Dentistry',
-    rating: 5.0,
-    reviews: 215,
-    location: 'Raihan Dental Clinic, Pediatric Wing',
-    experience: 11,
-    fee: 45,
-    education: 'BDS, Post-Grad Pediatric Dentistry',
-    image: 'https://picsum.photos/seed/doc3/200/200',
-    availableHours: '08:30 AM - 03:30 PM'
-  },
-  {
-    id: 'doc-james',
-    email: 'dr.james@telemed.com',
-    name: 'Dr. James Wilson (BDS, MDS)',
-    specialty: 'Oral Surgery',
-    subSpecialty: 'Wisdom Tooth & Maxillofacial Care',
-    rating: 4.8,
-    reviews: 112,
-    location: 'Raihan Dental Clinic, Surgical Suite',
-    experience: 15,
-    fee: 70,
-    education: 'BDS, MDS (Oral & Maxillofacial Surgery)',
-    image: 'https://picsum.photos/seed/doc4/200/200',
-    availableHours: '10:00 AM - 04:00 PM'
-  }
-];
-
 const SPECIALTY_FILTERS = [
   'All',
-  'Endodontics & Restorative Dentistry',
-  'Orthodontics',
-  'Periodontics',
+  'General Dentistry',
+  'Endodontics (Root Canal Specialist)',
+  'Orthodontics (Braces & Aligners)',
+  'Periodontics (Gum Care)',
   'Pediatric Dentistry',
-  'Oral Surgery'
+  'Oral & Maxillofacial Surgery'
 ];
 
 export default function Appointments() {
@@ -186,7 +108,7 @@ export default function Appointments() {
   // Core Data States
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [slots, setSlots] = useState<DoctorSlot[]>([]);
-  const [doctors, setDoctors] = useState<any[]>(DEFAULT_DOCTORS);
+  const [doctors, setDoctors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // View / Filter States
@@ -230,9 +152,8 @@ export default function Appointments() {
   const [creatingMeetId, setCreatingMeetId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{ [key: string]: { status: 'success' | 'error', message?: string } }>({});
 
-  // 1. Initial Seeding and Sync
+  // 1. Initial Load and Event Listeners
   useEffect(() => {
-    initSeedSlots();
     loadAllData();
 
     // Listen for custom cross-component updates
@@ -283,6 +204,25 @@ export default function Appointments() {
     setIsLoading(true);
     const localAppts = getLocalAppointments();
     const localSlots = getLocalSlots();
+
+    // Populate registered dentists dynamically
+    const registeredDentists = getRegisteredDentists();
+    const dynamicDoctors = registeredDentists.map(d => ({
+      id: d.id,
+      email: d.email,
+      name: d.name || d.email.split('@')[0],
+      specialty: d.specialty || 'General Dentistry',
+      subSpecialty: d.subSpecialty || 'Clinical Dental Practice',
+      rating: 5.0,
+      reviews: 0,
+      location: d.location || d.hospitalAffiliation || 'Raihan Dental Clinic',
+      experience: d.experience || 5,
+      fee: Number(d.consultationFee) || 50,
+      education: d.qualification || 'BDS',
+      image: d.image || '',
+      availableHours: d.workingHours || '09:00 AM - 05:00 PM'
+    }));
+    setDoctors(dynamicDoctors);
 
     // Filter appointments for current user
     if (profile?.email) {
@@ -1353,61 +1293,77 @@ export default function Appointments() {
               </div>
 
               {/* Doctors Directory Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDoctors.map(docItem => (
-                  <div
-                    key={docItem.id}
-                    className="bg-white p-6 rounded-[2.5rem] border border-slate-200/90 shadow-sm hover:shadow-xl hover:shadow-slate-100 transition-all flex flex-col justify-between space-y-5 group"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-100 shrink-0">
-                          {docItem.image ? (
-                            <img src={docItem.image} alt={docItem.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center font-black text-xl text-slate-400">
-                              {(docItem.name || 'D').charAt(0).toUpperCase()}
+              {filteredDoctors.length === 0 ? (
+                <div className="bg-white p-12 rounded-[2.5rem] border border-slate-200 text-center space-y-4 shadow-sm">
+                  <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto">
+                    <Stethoscope className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-lg font-bold text-slate-800">No Registered Dentists Available</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      {searchQuery 
+                        ? "No dentists match your search filter." 
+                        : "There are currently no registered dental specialists in the system. Registered dentists will appear here once registered."}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredDoctors.map(docItem => (
+                    <div
+                      key={docItem.id}
+                      className="bg-white p-6 rounded-[2.5rem] border border-slate-200/90 shadow-sm hover:shadow-xl hover:shadow-slate-100 transition-all flex flex-col justify-between space-y-5 group"
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-16 h-16 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-100 shrink-0">
+                            {docItem.image ? (
+                              <img src={docItem.image} alt={docItem.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-black text-xl text-slate-400">
+                                {(docItem.name || 'D').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-black text-slate-800 text-base">{docItem.name}</h4>
+                            <p className="text-xs font-bold text-emerald-600">{docItem.specialty}</p>
+                            <p className="text-[11px] text-slate-400 font-medium">{docItem.education || 'Clinical Specialist'}</p>
+                            <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
+                              <Star className="w-3.5 h-3.5 fill-amber-400" />
+                              <span>{docItem.rating || '5.0'}</span>
+                              <span className="text-[10px] text-slate-400">({docItem.reviews || 0} reviews)</span>
                             </div>
-                          )}
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-black text-slate-800 text-base">{docItem.name}</h4>
-                          <p className="text-xs font-bold text-emerald-600">{docItem.specialty}</p>
-                          <p className="text-[11px] text-slate-400 font-medium">{docItem.education || 'Clinical Specialist'}</p>
-                          <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
-                            <Star className="w-3.5 h-3.5 fill-amber-400" />
-                            <span>{docItem.rating || '4.9'}</span>
-                            <span className="text-[10px] text-slate-400">({docItem.reviews || 80}+ reviews)</span>
+
+                        <div className="p-3 bg-slate-50/70 rounded-2xl space-y-1.5 text-xs">
+                          <div className="flex items-center gap-1.5 text-slate-600 font-medium truncate">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{docItem.location}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{docItem.availableHours || '09:00 AM - 05:00 PM'}</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                            <span className="text-slate-400 font-semibold">Consultation Fee</span>
+                            <span className="font-black text-slate-800">${docItem.fee || 50}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="p-3 bg-slate-50/70 rounded-2xl space-y-1.5 text-xs">
-                        <div className="flex items-center gap-1.5 text-slate-600 font-medium truncate">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{docItem.location}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-600 font-medium">
-                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{docItem.availableHours || '09:00 AM - 05:00 PM'}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                          <span className="text-slate-400 font-semibold">Consultation Fee</span>
-                          <span className="font-black text-slate-800">${docItem.fee || 50}</span>
-                        </div>
-                      </div>
+                      <button
+                        onClick={() => handleOpenBookingModal(docItem)}
+                        className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-md shadow-slate-200 flex items-center justify-center gap-2 cursor-pointer group-hover:bg-emerald-600"
+                      >
+                        <span>Request Appointment</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
                     </div>
-
-                    <button
-                      onClick={() => handleOpenBookingModal(docItem)}
-                      className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-md shadow-slate-200 flex items-center justify-center gap-2 cursor-pointer group-hover:bg-emerald-600"
-                    >
-                      <span>Request Appointment</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
