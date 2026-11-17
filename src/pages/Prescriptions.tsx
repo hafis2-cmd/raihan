@@ -25,6 +25,11 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, addDoc, onSnapshot } from 'firebase/firestore';
+import { 
+  getLocalPrescriptions, 
+  addDentalPrescription, 
+  COMMON_DENTAL_MEDICATIONS 
+} from '../services/dentalService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -71,9 +76,38 @@ export default function Prescriptions() {
   useEffect(() => {
     if (!user || !profile) return;
 
+    const isDentistRole = profile.role === 'Doctor' || profile.role === 'Dentist';
+
+    // Initial local load
+    const localRx = getLocalPrescriptions();
+    const mappedLocal: Prescription[] = localRx.map(r => ({
+      id: r.id,
+      patientEmail: r.patient_email,
+      patientName: r.patient_name,
+      doctorName: r.dentist_name,
+      doctorEmail: r.dentist_email,
+      date: r.prescription_date,
+      medications: r.medications.map(m => ({
+        name: m.medicine_name,
+        dosage: m.dosage,
+        frequency: m.frequency,
+        duration: m.duration,
+        instructions: m.instructions
+      })),
+      notes: r.instructions || '',
+      timestamp: r.created_at
+    }));
+
+    if (isDentistRole) {
+      setPrescriptions(mappedLocal);
+    } else {
+      setPrescriptions(mappedLocal.filter(p => (p.patientEmail || '').toLowerCase() === (user.email || '').toLowerCase()));
+    }
+    setLoading(false);
+
     let q = query(collection(db, 'prescriptions'));
 
-    if (profile.role === 'Doctor') {
+    if (isDentistRole) {
       q = query(q, where('doctorEmail', '==', user.email));
     } else if (profile.role !== 'Admin') {
       q = query(q, where('patientEmail', '==', user.email));
@@ -96,11 +130,18 @@ export default function Prescriptions() {
           timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp
         });
       });
-      list.sort((a, b) => new Date(b.timestamp || b.date).getTime() - new Date(a.timestamp || a.date).getTime());
-      setPrescriptions(list);
+      if (list.length > 0) {
+        // Merge with local records
+        const map = new Map<string, Prescription>();
+        mappedLocal.forEach(m => map.set(m.id, m));
+        list.forEach(m => map.set(m.id, m));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp || b.date).getTime() - new Date(a.timestamp || a.date).getTime());
+        setPrescriptions(merged);
+      }
       setLoading(false);
     }, (err) => {
-      console.error('Error fetching prescriptions:', err);
+      console.warn('Error fetching Firestore prescriptions, using local:', err);
       setLoading(false);
     });
 
@@ -119,8 +160,14 @@ export default function Prescriptions() {
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black text-slate-800 tracking-tight">Prescriptions</h1>
-          <p className="text-slate-500 font-medium">View and manage medical prescriptions and medication schedules.</p>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Dental Prescriptions
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">• Oral Medications</span>
+          </div>
+          <h1 className="text-4xl font-black text-slate-800 tracking-tight">Dental Prescriptions</h1>
+          <p className="text-slate-500 font-medium">View and manage clinical dental prescriptions and medication schedules.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -131,17 +178,17 @@ export default function Prescriptions() {
               placeholder="Search prescriptions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all w-64 shadow-sm"
+              className="pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition-all w-64 shadow-sm"
             />
           </div>
           
-          {profile?.role === 'Doctor' && (
+          {(profile?.role === 'Doctor' || profile?.role === 'Dentist') && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+              className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-md shadow-slate-200 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              New Prescription
+              <Plus className="w-4 h-4 text-emerald-400" />
+              <span>Issue Dental Prescription</span>
             </button>
           )}
         </div>
@@ -281,11 +328,11 @@ const handlePrintPrescription = (p: Prescription) => {
       <body>
         <div class="header">
           <div>
-            <div class="logo">🌿 Raihan Telemedicine</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Digital Clinical Consultation & Care</div>
+            <div class="logo">🦷 Raihan Dental Clinic</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Oral Healthcare & Clinical Dental Prescriptions</div>
           </div>
           <div class="clinic-info">
-            <strong>Raihan Virtual Health Center</strong><br/>
+            <strong>Raihan Dental Health Center</strong><br/>
             Ref: RX-${p.id ? p.id.slice(0, 8).toUpperCase() : 'PENDING'}<br/>
             Date: ${p.date || new Date().toLocaleDateString()}
           </div>
@@ -298,7 +345,7 @@ const handlePrintPrescription = (p: Prescription) => {
             <div class="meta-item">${p.patientEmail}</div>
           </div>
           <div style="text-align: right;">
-            <div class="meta-label">Prescribing Physician</div>
+            <div class="meta-label">Attending Dental Surgeon</div>
             <div class="meta-item"><strong>Dr. ${p.doctorName}</strong></div>
             <div class="meta-item">${p.doctorEmail}</div>
           </div>
@@ -309,7 +356,7 @@ const handlePrintPrescription = (p: Prescription) => {
         <table>
           <thead>
             <tr>
-              <th>Medication</th>
+              <th>Dental Medication</th>
               <th>Dosage</th>
               <th>Frequency</th>
               <th>Duration</th>
@@ -331,20 +378,20 @@ const handlePrintPrescription = (p: Prescription) => {
 
         ${p.notes ? `
           <div class="notes-box">
-            <strong>Physician Clinical Notes:</strong><br/>
+            <strong>Dentist Instructions & Oral Care:</strong><br/>
             ${p.notes}
           </div>
         ` : ''}
 
         <div class="footer">
           <div class="stamp">
-            ✔ Digitally Verified Prescription<br/>
-            <span style="font-size: 9px; font-weight: normal; color: #64748b;">Raihan Telemedicine Verified</span>
+            ✔ Digitally Verified Dental Prescription<br/>
+            <span style="font-size: 9px; font-weight: normal; color: #64748b;">Raihan Dental Clinic Verified</span>
           </div>
           <div class="signature">
             <div class="signature-line"></div>
             <strong>Dr. ${p.doctorName}</strong><br/>
-            <span style="font-size: 11px; color: #64748b;">Licensed Medical Practitioner</span>
+            <span style="font-size: 11px; color: #64748b;">Chief Dental Surgeon (BDS, MDS)</span>
           </div>
         </div>
         <script>
@@ -568,7 +615,7 @@ function AddPrescriptionModal({ onClose }: { onClose: () => void }) {
         patientEmail: formData.patientEmail,
         patientName: formData.patientName,
         notes: formData.notes || '',
-        doctorName: user.displayName || profile?.name || 'Doctor',
+        doctorName: user.displayName || profile?.name || 'Dr. Raihan (BDS, MDS)',
         doctorEmail: user.email,
         date: new Date().toISOString().split('T')[0],
         timestamp: new Date()
@@ -580,7 +627,22 @@ function AddPrescriptionModal({ onClose }: { onClose: () => void }) {
         prescriptionData.prescriptionImage = formData.prescriptionImage || '';
       }
 
-      await addDoc(collection(db, 'prescriptions'), prescriptionData);
+      // Save to local service and Firestore
+      await addDentalPrescription({
+        patient_email: formData.patientEmail,
+        patient_name: formData.patientName || (formData.patientEmail ? formData.patientEmail.split('@')[0] : 'Patient'),
+        dentist_email: user.email || 'dr.raihan@telemed.com',
+        dentist_name: user.displayName || profile?.name || 'Dr. Raihan (BDS, MDS)',
+        prescription_date: new Date().toISOString().split('T')[0],
+        medications: formData.medications.map(m => ({
+          medicine_name: m.name,
+          dosage: m.dosage,
+          frequency: m.frequency,
+          duration: m.duration,
+          instructions: m.instructions
+        })),
+        instructions: formData.notes
+      });
 
       setSuccess(true);
       setTimeout(() => onClose(), 2000);
@@ -682,6 +744,50 @@ function AddPrescriptionModal({ onClose }: { onClose: () => void }) {
 
               {mode === 'write' ? (
                 <div className="space-y-6">
+                  {/* Common Dental Medications Quick-Add Chips */}
+                  <div className="space-y-2 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                      Quick-Add Common Dental Prescriptions
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {COMMON_DENTAL_MEDICATIONS.map((preset, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => {
+                            // Check if first med is blank, otherwise append
+                            if (formData.medications.length === 1 && !formData.medications[0].name) {
+                              setFormData({
+                                ...formData,
+                                medications: [{
+                                  name: preset.name,
+                                  dosage: preset.dosage,
+                                  frequency: preset.frequency,
+                                  duration: preset.duration,
+                                  instructions: preset.instructions
+                                }]
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                medications: [...formData.medications, {
+                                  name: preset.name,
+                                  dosage: preset.dosage,
+                                  frequency: preset.frequency,
+                                  duration: preset.duration,
+                                  instructions: preset.instructions
+                                }]
+                              });
+                            }
+                          }}
+                          className="px-2.5 py-1.5 bg-white hover:bg-emerald-600 hover:text-white text-slate-700 text-xs font-bold rounded-xl border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                        >
+                          + {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2">
                       <Pill className="w-5 h-5 text-emerald-500" />

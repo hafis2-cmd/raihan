@@ -11,20 +11,15 @@ import FloatingFAQ from './components/FloatingFAQ';
 
 // Lazy load pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-// const Diagnosis = lazy(() => import('./pages/Diagnosis'));
-// const MedicalStore = lazy(() => import('./pages/MedicalStore'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Appointments = lazy(() => import('./pages/Appointments'));
-// const Consultation = lazy(() => import('./pages/Consultation'));
+const Consultations = lazy(() => import('./pages/Consultations'));
 const Prescriptions = lazy(() => import('./pages/Prescriptions'));
 const Payments = lazy(() => import('./pages/Payments'));
-// const Subscription = lazy(() => import('./pages/Subscription'));
-// const Doctors = lazy(() => import('./pages/Doctors'));
 const Patients = lazy(() => import('./pages/Patients'));
 const Messages = lazy(() => import('./pages/Messages'));
 const CallHistory = lazy(() => import('./pages/CallHistory'));
 const Login = lazy(() => import('./pages/Login'));
-// const SharedDiagnosis = lazy(() => import('./pages/SharedDiagnosis'));
 
 const LoadingScreen = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -75,15 +70,11 @@ function AppRoutes() {
                 <Suspense fallback={<LoadingScreen />}>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    {/* <Route path="/diagnosis" element={<Diagnosis />} /> */}
-                    {/* <Route path="/store" element={<MedicalStore />} /> */}
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/consultations" element={<Consultations />} />
                     <Route path="/appointments" element={<Appointments />} />
-                    {/* <Route path="/consultation" element={<Consultation />} /> */}
                     <Route path="/prescriptions" element={<Prescriptions />} />
                     <Route path="/payments" element={<Payments />} />
-                    {/* <Route path="/subscription" element={<Subscription />} /> */}
-                    {/* <Route path="/doctors" element={<Doctors />} /> */}
                     <Route path="/patients" element={<Patients />} />
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/call-history" element={<CallHistory />} />

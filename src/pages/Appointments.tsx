@@ -87,80 +87,80 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Medical Specialists default catalog
+// Dental Specialists default catalog
 const DEFAULT_DOCTORS = [
   {
     id: 'doc-raihan',
     email: 'dr.raihan@telemed.com',
-    name: 'Dr. Raihan (MD)',
-    specialty: 'Cardiology',
-    subSpecialty: 'Preventive Cardiology & Internal Medicine',
+    name: 'Dr. Raihan (BDS, MDS)',
+    specialty: 'Endodontics & Restorative Dentistry',
+    subSpecialty: 'Root Canal Specialist & Smile Makeover',
     rating: 4.9,
-    reviews: 142,
-    location: 'Raihan Central Hospital, Suite 402',
+    reviews: 168,
+    location: 'Raihan Dental Clinic, Suite 101',
     experience: 12,
     fee: 50,
-    education: 'MBBS, MD (General Medicine), FACC',
+    education: 'BDS, MDS (Oral & Maxillofacial Surgery), FICOI',
     image: 'https://picsum.photos/seed/raihan-doc/200/200',
     availableHours: '09:00 AM - 05:00 PM'
   },
   {
     id: 'doc-sarah',
     email: 'dr.sarah@telemed.com',
-    name: 'Dr. Sarah Johnson',
-    specialty: 'Cardiology',
-    subSpecialty: 'Interventional Cardiology',
+    name: 'Dr. Sarah Jenkins (BDS, MDS)',
+    specialty: 'Orthodontics',
+    subSpecialty: 'Clear Aligners & Dentofacial Orthopedics',
     rating: 4.9,
-    reviews: 124,
-    location: 'Central Heart Institute, Floor 3',
+    reviews: 134,
+    location: 'Raihan Dental Clinic, Suite 102',
     experience: 14,
     fee: 65,
-    education: 'MD, FACC',
+    education: 'BDS, MDS (Orthodontics)',
     image: 'https://picsum.photos/seed/doc1/200/200',
     availableHours: '09:00 AM - 04:30 PM'
   },
   {
     id: 'doc-michael',
     email: 'dr.michael@telemed.com',
-    name: 'Dr. Michael Chen',
-    specialty: 'Dermatology',
-    subSpecialty: 'Clinical & Cosmetic Dermatology',
+    name: 'Dr. Michael Vance (DDS)',
+    specialty: 'Periodontics',
+    subSpecialty: 'Gum Health & Dental Implants',
     rating: 4.8,
-    reviews: 89,
-    location: 'Skin & Wellness Center',
-    experience: 9,
-    fee: 45,
-    education: 'MD (Dermatology)',
+    reviews: 98,
+    location: 'Raihan Dental Clinic, Suite 103',
+    experience: 10,
+    fee: 55,
+    education: 'DDS, Periodontology Certification',
     image: 'https://picsum.photos/seed/doc2/200/200',
-    availableHours: '11:00 AM - 05:00 PM'
+    availableHours: '10:00 AM - 05:00 PM'
   },
   {
     id: 'doc-emily',
     email: 'dr.emily@telemed.com',
-    name: 'Dr. Emily White',
-    specialty: 'Pediatrics',
-    subSpecialty: 'Pediatric Primary Care & Development',
+    name: 'Dr. Emily Chen (BDS)',
+    specialty: 'Pediatric Dentistry',
+    subSpecialty: 'Children Oral Care & Preventive Dentistry',
     rating: 5.0,
-    reviews: 210,
-    location: "Children's Care Hospital",
+    reviews: 215,
+    location: 'Raihan Dental Clinic, Pediatric Wing',
     experience: 11,
-    fee: 55,
-    education: 'MD, FAAP',
+    fee: 45,
+    education: 'BDS, Post-Grad Pediatric Dentistry',
     image: 'https://picsum.photos/seed/doc3/200/200',
     availableHours: '08:30 AM - 03:30 PM'
   },
   {
     id: 'doc-james',
     email: 'dr.james@telemed.com',
-    name: 'Dr. James Wilson',
-    specialty: 'Neurology',
-    subSpecialty: 'Neuro-vascular & Migraine Care',
-    rating: 4.7,
-    reviews: 78,
-    location: 'Metro NeuroScience Clinic',
-    experience: 16,
+    name: 'Dr. James Wilson (BDS, MDS)',
+    specialty: 'Oral Surgery',
+    subSpecialty: 'Wisdom Tooth & Maxillofacial Care',
+    rating: 4.8,
+    reviews: 112,
+    location: 'Raihan Dental Clinic, Surgical Suite',
+    experience: 15,
     fee: 70,
-    education: 'MD, PhD',
+    education: 'BDS, MDS (Oral & Maxillofacial Surgery)',
     image: 'https://picsum.photos/seed/doc4/200/200',
     availableHours: '10:00 AM - 04:00 PM'
   }
@@ -168,12 +168,11 @@ const DEFAULT_DOCTORS = [
 
 const SPECIALTY_FILTERS = [
   'All',
-  'Cardiology',
-  'Dermatology',
-  'Pediatrics',
-  'Neurology',
-  'General Medicine',
-  'Orthopedics'
+  'Endodontics & Restorative Dentistry',
+  'Orthodontics',
+  'Periodontics',
+  'Pediatric Dentistry',
+  'Oral Surgery'
 ];
 
 export default function Appointments() {
@@ -181,7 +180,7 @@ export default function Appointments() {
   const navigate = useNavigate();
   const { confirm } = useConfirmation();
 
-  const isDoctor = profile?.role === 'Doctor';
+  const isDoctor = profile?.role === 'Doctor' || profile?.role === 'Dentist';
   const isPatient = !isDoctor; // default patient view
 
   // Core Data States
@@ -655,17 +654,17 @@ export default function Appointments() {
               "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
               isDoctor ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
             )}>
-              {isDoctor ? 'Doctor Schedule Controller' : 'Patient Appointment Portal'}
+              {isDoctor ? 'Dentist Schedule Controller' : 'Patient Dental Booking Portal'}
             </span>
-            <span className="text-xs text-slate-400 font-semibold">• Role-Based Approval Workflow</span>
+            <span className="text-xs text-slate-400 font-semibold">• Dentist Approval Workflow</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
-            {isDoctor ? 'Appointment Requests & Schedule' : 'Schedule a Consultation'}
+            {isDoctor ? 'Dental Appointment Requests & Schedule' : 'Schedule a Dental Visit'}
           </h1>
           <p className="text-slate-500 font-medium text-sm md:text-base">
             {isDoctor 
-              ? 'Review pending patient consultation requests, approve time slots, and manage your availability.'
-              : 'Select a physician, choose an open clinical slot, and submit an appointment request for doctor approval.'}
+              ? 'Review pending patient dental requests, approve time slots, and manage clinic availability.'
+              : 'Select a dentist, choose an open clinical slot, and submit an appointment request for dentist approval.'}
           </p>
         </div>
 
@@ -1027,8 +1026,8 @@ export default function Appointments() {
                   <div className="flex items-center gap-3 border-b border-white/15 pb-3">
                     <Stethoscope className="w-6 h-6 text-white" />
                     <div>
-                      <h3 className="font-black text-base">Doctor Availability Manager</h3>
-                      <p className="text-[10px] text-emerald-100 font-semibold">Define your bookable schedule</p>
+                      <h3 className="font-black text-base">Dentist Availability Manager</h3>
+                      <p className="text-[10px] text-emerald-100 font-semibold">Define your clinic appointment schedule</p>
                     </div>
                   </div>
 
@@ -1246,8 +1245,8 @@ export default function Appointments() {
                   : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
               )}
             >
-              <Search className="w-4 h-4 text-blue-500" />
-              <span>Find & Book Doctor</span>
+              <Search className="w-4 h-4 text-emerald-500" />
+              <span>Find & Book Dentist</span>
             </button>
 
             <button
@@ -1328,7 +1327,7 @@ export default function Appointments() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search doctor by name, specialty, or clinic location..."
+                    placeholder="Search dentist by name, dental specialty, or clinic location..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all shadow-xs"
@@ -1894,16 +1893,38 @@ export default function Appointments() {
                 </div>
 
                 {/* Step 3: Reason for Consultation */}
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                    3. Reason for Consultation & Symptoms <span className="text-rose-500">*</span>
+                    3. Reason for Dental Visit & Symptoms <span className="text-rose-500">*</span>
                   </label>
+                  
+                  {/* Quick Dental Concern Chips */}
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {[
+                      'Toothache & cold sensitivity',
+                      'Routine dental cleaning (Scaling)',
+                      'Broken filling or chipped tooth',
+                      'Bleeding/swollen gums',
+                      'Root canal pain evaluation',
+                      'Wisdom tooth swelling'
+                    ].map(chip => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setBookingReason(chip)}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        + {chip}
+                      </button>
+                    ))}
+                  </div>
+
                   <textarea
                     rows={3}
                     required
                     value={bookingReason}
                     onChange={(e) => setBookingReason(e.target.value)}
-                    placeholder="Describe your health symptoms, medical purpose, or specific concerns for this visit..."
+                    placeholder="Describe your dental concern, tooth number if known, pain severity, or procedure requested..."
                     className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs transition-all resize-none"
                   />
                 </div>
@@ -1912,10 +1933,10 @@ export default function Appointments() {
                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1">
                   <p className="font-bold flex items-center gap-1.5">
                     <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Doctor Controlled Approval</span>
+                    <span>Dentist Controlled Approval</span>
                   </p>
                   <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                    Submitting this request does not confirm the appointment. Dr. {bookingDoctor.name} will independently accept or decline your request based on clinical availability. You will receive an immediate notification once reviewed.
+                    Submitting this request does not confirm the appointment. {bookingDoctor.name} will independently accept or decline your request based on clinic chair availability. You will receive an immediate notification once reviewed.
                   </p>
                 </div>
 

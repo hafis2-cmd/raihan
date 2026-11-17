@@ -63,7 +63,7 @@ export interface SystemNotification {
   senderEmail?: string;
   title: string;
   message: string;
-  type: 'appointment_request' | 'appointment_accepted' | 'appointment_rejected' | 'appointment_cancelled' | 'appointment_reminder';
+  type: 'appointment_request' | 'appointment_accepted' | 'appointment_rejected' | 'appointment_cancelled' | 'appointment_reminder' | 'consultation_recorded' | 'prescription_created';
   appointmentId?: string;
   isRead: boolean;
   timestamp?: any;

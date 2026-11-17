@@ -44,21 +44,16 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const MEDICAL_SPECIALTIES = [
-  'General Medicine',
-  'Cardiology',
-  'Dermatology',
-  'Pediatrics',
-  'Neurology',
-  'Orthopedics',
-  'Psychiatry',
-  'ENT (Otolaryngology)',
-  'Ophthalmology',
-  'Oncology',
-  'Gynecology & Obstetrics',
-  'Endocrinology',
-  'Pulmonology',
-  'Gastroenterology'
+const DENTAL_SPECIALTIES = [
+  'General Dentistry',
+  'Endodontics (Root Canal Specialist)',
+  'Orthodontics (Braces & Aligners)',
+  'Periodontics (Gum Disease & Implants)',
+  'Prosthodontics (Crowns & Bridges)',
+  'Oral & Maxillofacial Surgery',
+  'Pediatric Dentistry (Pedodontics)',
+  'Cosmetic Dentistry & Whitening',
+  'Oral Pathology & Radiology'
 ];
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -240,7 +235,7 @@ export default function Profile() {
     }
   };
 
-  const isDoctor = profile?.role === 'Doctor';
+  const isDoctor = profile?.role === 'Doctor' || profile?.role === 'Dentist';
   const isPatient = profile?.role === 'Patient';
   const isAdmin = profile?.role === 'Admin';
 
@@ -256,17 +251,17 @@ export default function Profile() {
               isAdmin ? "bg-purple-50 text-purple-700 border-purple-200" :
               "bg-blue-50 text-blue-700 border-blue-200"
             )}>
-              {profile?.role || 'Patient'} Account
+              {isDoctor ? 'Dentist' : profile?.role || 'Patient'} Account
             </span>
             <span className="text-xs text-slate-400 font-semibold">• Permanent Profile Sync</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
-            {isDoctor ? 'Doctor Clinical Profile' : isPatient ? 'Patient Medical Profile' : 'System Administrator Profile'}
+            {isDoctor ? 'Dentist Clinical Profile' : isPatient ? 'Patient Dental Profile' : 'System Administrator Profile'}
           </h1>
           <p className="text-slate-500 font-medium text-sm md:text-base">
             {isDoctor 
-              ? 'Configure your clinical credentials, physical hospital affiliation, consultation fee, and patient triage availability.'
-              : 'Keep your personal vitals, active medications, emergency contacts, and health history accurate for clinical consultations.'}
+              ? 'Configure your dental qualifications (BDS/MDS), dental specialty, clinic affiliation, consultation fee, and available clinic hours.'
+              : 'Keep your personal dental history, allergies, emergency contacts, and oral health records accurate for clinic appointments.'}
           </p>
         </div>
 
@@ -351,42 +346,42 @@ export default function Profile() {
 
           {/* Role-Specific Summary Box */}
           {isDoctor ? (
-            /* Doctor Clinical Credentials Sidebar Card */
+            /* Dentist Clinical Credentials Sidebar Card */
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-[2rem] text-white space-y-4 shadow-xl shadow-emerald-200">
               <div className="flex items-center gap-3 border-b border-white/15 pb-3">
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
                   <Stethoscope className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm tracking-wide">Clinical Practice</h3>
-                  <span className="text-[10px] text-emerald-200 font-semibold">Verified Practitioner</span>
+                  <h3 className="font-bold text-sm tracking-wide">Dental Practice</h3>
+                  <span className="text-[10px] text-emerald-200 font-semibold">Registered Dental Surgeon</span>
                 </div>
               </div>
 
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-emerald-100">Specialty</span>
-                  <span className="font-bold text-right">{formData.specialty || 'General Medicine'}</span>
+                  <span className="font-bold text-right">{formData.specialty || 'General Dentistry'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-emerald-100">Sub-Specialty</span>
-                  <span className="font-bold text-right">{formData.subSpecialty || 'Clinical Care'}</span>
+                  <span className="font-bold text-right">{formData.subSpecialty || 'Endodontics & Crowns'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-emerald-100">Experience</span>
                   <span className="font-bold text-right">{formData.experience ? `${formData.experience} Years` : '10+ Years'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
-                  <span className="text-emerald-100">License No.</span>
-                  <span className="font-mono font-bold text-right">{formData.licenseNumber || 'RMC-84920'}</span>
+                  <span className="text-emerald-100">Dental Reg No.</span>
+                  <span className="font-mono font-bold text-right">{formData.licenseNumber || 'DDC-98421'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-white/10">
                   <span className="text-emerald-100">Consultation Fee</span>
-                  <span className="font-bold text-emerald-200 text-right">${formData.consultationFee || '50'} / Session</span>
+                  <span className="font-bold text-emerald-200 text-right">${formData.consultationFee || '50'} / Visit</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-emerald-100">Hospital Base</span>
-                  <span className="font-bold text-right truncate max-w-[140px]">{formData.hospitalAffiliation || formData.location || 'Raihan Central Hospital'}</span>
+                  <span className="text-emerald-100">Dental Clinic Base</span>
+                  <span className="font-bold text-right truncate max-w-[140px]">{formData.hospitalAffiliation || formData.location || 'Raihan Dental Clinic'}</span>
                 </div>
               </div>
             </div>
@@ -398,7 +393,7 @@ export default function Profile() {
                   <HeartPulse className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm tracking-wide">Patient Vitals</h3>
+                  <h3 className="font-bold text-sm tracking-wide">Patient Dental Chart</h3>
                   <span className="text-[10px] text-blue-200 font-semibold">Clinical Snapshot</span>
                 </div>
               </div>
@@ -425,8 +420,8 @@ export default function Profile() {
                   <span className="font-bold text-right truncate max-w-[130px]">{formData.emergencyContactName || 'Jane Doe'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-blue-100">Insurance Provider</span>
-                  <span className="font-bold text-right truncate max-w-[130px]">{formData.insuranceProvider || 'BlueShield'}</span>
+                  <span className="text-blue-100">Dental Insurance</span>
+                  <span className="font-bold text-right truncate max-w-[130px]">{formData.insuranceProvider || 'Delta Dental'}</span>
                 </div>
               </div>
             </div>
@@ -437,43 +432,43 @@ export default function Profile() {
         <div className="lg:col-span-2">
           <form onSubmit={handleSave} className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-200/80 shadow-sm space-y-8">
             
-            {/* DOCTOR VIEW */}
+            {/* DENTIST VIEW */}
             {isDoctor && (
               <>
                 {/* Section 1: Professional Credentials */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <Stethoscope className="w-5 h-5 text-emerald-600" />
-                    <h3 className="font-black text-slate-800 text-lg">Doctor Credentials & Identification</h3>
+                    <h3 className="font-black text-slate-800 text-lg">Dentist Credentials & Registration</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Full Doctor Name</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Full Dentist Name</label>
                       <input
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="Dr. Full Name (MD)"
+                        placeholder="Dr. Raihan (BDS, MDS)"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Medical License / Reg Number</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dental Council Reg Number</label>
                       <input
                         type="text"
                         value={formData.licenseNumber}
                         onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. RMC-84920-IN"
+                        placeholder="e.g. DDC-84920"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Primary Clinical Specialty</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Primary Dental Specialty</label>
                       <select
                         value={formData.specialty}
                         onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
@@ -481,7 +476,7 @@ export default function Profile() {
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         <option value="">Select Specialty</option>
-                        {MEDICAL_SPECIALTIES.map(s => (
+                        {DENTAL_SPECIALTIES.map(s => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
@@ -494,7 +489,7 @@ export default function Profile() {
                         value={formData.subSpecialty}
                         onChange={(e) => setFormData({ ...formData, subSpecialty: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. Preventive Cardiology & Cardiac Rehab"
+                        placeholder="e.g. Microscopic Endodontics & Smile Aesthetics"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -506,13 +501,13 @@ export default function Profile() {
                         value={formData.education}
                         onChange={(e) => setFormData({ ...formData, education: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. MBBS, MD (General Medicine), FACC"
+                        placeholder="e.g. BDS, MDS (Conservative Dentistry & Endodontics)"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Years of Clinical Experience</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Years of Dental Experience</label>
                       <input
                         type="number"
                         min="0"
@@ -527,34 +522,34 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* Section 2: Clinical Practice & Telehealth Settings */}
+                {/* Section 2: Clinical Practice & Clinic Settings */}
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <Building className="w-5 h-5 text-emerald-600" />
-                    <h3 className="font-black text-slate-800 text-lg">Hospital Base & Practice Settings</h3>
+                    <h3 className="font-black text-slate-800 text-lg">Dental Clinic Affiliation & Hours</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Hospital / Clinic Affiliation</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dental Clinic Name</label>
                       <input
                         type="text"
                         value={formData.hospitalAffiliation}
                         onChange={(e) => setFormData({ ...formData, hospitalAffiliation: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. Raihan Central Hospital, Suite 402"
+                        placeholder="e.g. Raihan Dental Clinic"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Practice Physical Address</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Clinic Address</label>
                       <input
                         type="text"
                         value={formData.location}
                         onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. 101 Health Parkway, Metro Medical District"
+                        placeholder="e.g. 101 Dental Plaza, Suite 4B, Raihan Medical City"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -574,7 +569,7 @@ export default function Profile() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Consultation Working Hours</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Clinic Working Hours</label>
                       <input
                         type="text"
                         value={formData.workingHours}
@@ -586,7 +581,7 @@ export default function Profile() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Direct Clinical Phone</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Clinic Contact Phone</label>
                       <input
                         type="tel"
                         value={formData.phone}
@@ -598,7 +593,7 @@ export default function Profile() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Profile Avatar Image URL</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dentist Photo URL</label>
                       <input
                         type="url"
                         value={formData.image}
@@ -611,13 +606,13 @@ export default function Profile() {
                   </div>
 
                   <div className="space-y-1.5 pt-2">
-                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Doctor Clinical Bio & Consultation Philosophy</label>
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dentist Bio & Patient Care Philosophy</label>
                     <textarea
                       rows={4}
                       value={formData.bio}
                       onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                       disabled={!isEditing}
-                      placeholder="Outline your medical background, certifications, and approach to digital telemedicine care..."
+                      placeholder="Share your dental background, expertise in treatments, and patient care philosophy..."
                       className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
                     />
                   </div>
@@ -757,21 +752,21 @@ export default function Profile() {
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <Activity className="w-5 h-5 text-rose-500" />
-                    <h3 className="font-black text-slate-800 text-lg">Clinical Background & Medications</h3>
+                    <h3 className="font-black text-slate-800 text-lg">Dental & Clinical Background</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-                        Known Drug & Food Allergies
+                        Known Drug & Material Allergies
                       </label>
                       <textarea
                         rows={3}
                         value={formData.allergies}
                         onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. Penicillin, Dust pollen, Peanuts"
+                        placeholder="e.g. Penicillin, Local Anesthetics (Lidocaine), Latex (or 'None')"
                         className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none text-sm transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -779,14 +774,14 @@ export default function Profile() {
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                         <Heart className="w-3.5 h-3.5 text-amber-500" />
-                        Chronic Conditions
+                        Systemic / Chronic Conditions
                       </label>
                       <textarea
                         rows={3}
                         value={formData.chronicConditions}
                         onChange={(e) => setFormData({ ...formData, chronicConditions: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. Hypertension, Type 2 Diabetes, Asthma (or 'None')"
+                        placeholder="e.g. Hypertension, Type 2 Diabetes, Bleeding disorders (or 'None')"
                         className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-amber-400 outline-none text-sm transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -801,7 +796,7 @@ export default function Profile() {
                         value={formData.currentMedications}
                         onChange={(e) => setFormData({ ...formData, currentMedications: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. Cetirizine 10mg daily, Metformin 500mg, Vitamin D3"
+                        placeholder="e.g. Blood thinners, Aspirin, Vitamin D3, Blood pressure meds"
                         className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-400 outline-none text-sm transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -809,14 +804,14 @@ export default function Profile() {
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-blue-600" />
-                        Past Surgeries & Clinical History
+                        Relevant Dental & Treatment History
                       </label>
                       <textarea
                         rows={3}
                         value={formData.medicalHistory}
                         onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. Appendectomy in 2018; regular dental cleanings; no previous hospitalizations."
+                        placeholder="e.g. Previous root canal treatment, orthodontic braces in 2020, regular scaling, teeth sensitivity"
                         className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-blue-400 outline-none text-sm transition-all resize-none disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -827,7 +822,7 @@ export default function Profile() {
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <Shield className="w-5 h-5 text-indigo-600" />
-                    <h3 className="font-black text-slate-800 text-lg">Emergency Contact & Health Insurance</h3>
+                    <h3 className="font-black text-slate-800 text-lg">Emergency Contact & Dental Insurance</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -868,13 +863,13 @@ export default function Profile() {
                     </div>
 
                     <div className="md:col-span-2 space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Health Insurance Provider</label>
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dental Insurance Provider</label>
                       <input
                         type="text"
                         value={formData.insuranceProvider}
                         onChange={(e) => setFormData({ ...formData, insuranceProvider: e.target.value })}
                         disabled={!isEditing}
-                        placeholder="e.g. BlueShield Health, UnitedHealth, Medicare"
+                        placeholder="e.g. Delta Dental, Cigna Dental, Guardian"
                         className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>

@@ -41,6 +41,42 @@ interface Payment {
   timestamp: any;
 }
 
+const DEFAULT_DENTAL_PAYMENTS: Payment[] = [
+  {
+    id: 'pay-001',
+    patientEmail: 'patient@telemed.com',
+    patientName: 'John Doe',
+    amount: 50,
+    currency: 'USD',
+    status: 'completed',
+    description: 'Dental Consultation & Oral Examination',
+    method: 'Credit Card',
+    timestamp: '2026-11-10T11:30:00Z'
+  },
+  {
+    id: 'pay-002',
+    patientEmail: 'patient@telemed.com',
+    patientName: 'John Doe',
+    amount: 280,
+    currency: 'USD',
+    status: 'completed',
+    description: 'Root Canal Treatment (RCT) – Stage 1',
+    method: 'Digital Payment',
+    timestamp: '2026-11-10T12:00:00Z'
+  },
+  {
+    id: 'pay-003',
+    patientEmail: 'patient@telemed.com',
+    patientName: 'John Doe',
+    amount: 75,
+    currency: 'USD',
+    status: 'pending',
+    description: 'Ultrasonic Dental Scaling (Cleaning)',
+    method: 'Pending Counter Settlement',
+    timestamp: '2026-11-17T09:00:00Z'
+  }
+];
+
 export default function Payments() {
   const { user, profile } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -48,6 +84,7 @@ export default function Payments() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all');
+  
   const handleDownloadReceipt = (p: Payment) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -58,11 +95,11 @@ export default function Payments() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Receipt - ${p.id.slice(0, 8).toUpperCase()}</title>
+          <title>Dental Receipt - ${p.id.slice(0, 8).toUpperCase()}</title>
           <style>
             @page { size: A4; margin: 15mm; }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; padding: 24px; line-height: 1.5; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
             .logo { font-size: 24px; font-weight: 800; color: #059669; }
             .paid-badge { display: inline-block; background: #dcfce7; color: #15803d; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; }
             .box { background: #f8fafc; border-radius: 12px; padding: 16px; margin-bottom: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -76,8 +113,9 @@ export default function Payments() {
         <body>
           <div class="header">
             <div>
-              <div class="logo">🌿 Raihan Telemedicine</div>
-              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Payment Invoice & Official Receipt</div>
+              <div class="logo">🦷 Raihan Dental Clinic</div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Dental Treatment Invoice & Official Receipt</div>
+              <div style="font-size: 11px; color: #94a3b8;">Suite 101, Raihan Dental Health Center • Tel: +1 (555) 234-5678</div>
             </div>
             <div style="text-align: right;">
               <span class="paid-badge">✔ ${p.status.toUpperCase()}</span>
@@ -87,42 +125,42 @@ export default function Payments() {
 
           <div class="box">
             <div>
-              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Patient Info</div>
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Patient Information</div>
               <div style="font-weight: 700; margin-top: 4px;">${p.patientName || p.patientEmail}</div>
               <div style="font-size: 12px; color: #64748b;">${p.patientEmail}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Transaction Info</div>
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Transaction Details</div>
               <div style="margin-top: 4px; font-size: 13px;">Date: ${p.timestamp ? new Date(p.timestamp).toLocaleDateString() : new Date().toLocaleDateString()}</div>
-              <div style="font-size: 12px; color: #64748b;">Method: ${p.method || 'Card / Digital Transfer'}</div>
+              <div style="font-size: 12px; color: #64748b;">Payment Method: ${p.method || 'Card / Digital Settlement'}</div>
             </div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>Service Description</th>
-                <th style="text-align: right;">Amount</th>
+                <th>Dental Treatment / Service Description</th>
+                <th style="text-align: right;">Fee</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>
-                  <strong>${p.description || 'Clinical Teleconsultation Fee'}</strong><br/>
-                  <span style="font-size: 12px; color: #64748b;">Clinical medical service provided on Raihan Telemedicine.</span>
+                  <strong>${p.description || 'Dental Consultation & Examination Fee'}</strong><br/>
+                  <span style="font-size: 12px; color: #64748b;">Clinical dental procedure rendered at Raihan Dental Clinic.</span>
                 </td>
                 <td style="text-align: right; font-weight: 700;">$${p.amount.toFixed(2)}</td>
               </tr>
               <tr class="total-row">
-                <td>Total Amount Paid</td>
+                <td>Total Settlement</td>
                 <td style="text-align: right; color: #059669;">$${p.amount.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
 
           <div class="footer">
-            Thank you for choosing Raihan Telemedicine.<br/>
-            For billing inquiries or insurance claim copies, contact support@raihan.care
+            Thank you for choosing Raihan Dental Clinic.<br/>
+            For oral healthcare inquiries, contact info@raihan.dental
           </div>
           <script>
             window.onload = function() { window.print(); }
@@ -484,11 +522,31 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const DENTAL_SERVICES = [
+    { label: 'Dental Consultation & Examination', price: '50.00' },
+    { label: 'Dental Cleaning (Scaling) & Polishing', price: '75.00' },
+    { label: 'Composite Tooth Filling', price: '90.00' },
+    { label: 'Root Canal Treatment (RCT)', price: '280.00' },
+    { label: 'Porcelain Dental Crown', price: '350.00' },
+    { label: 'Tooth Extraction', price: '80.00' },
+    { label: 'Professional Tooth Whitening', price: '200.00' },
+    { label: 'Orthodontic Consultation', price: '65.00' },
+  ];
+
   const [formData, setFormData] = useState({
-    amount: '',
-    description: 'Consultation Fee',
+    amount: '50.00',
+    description: 'Dental Consultation & Examination',
     method: 'Visa •••• 4242'
   });
+
+  const handleSelectService = (desc: string) => {
+    const match = DENTAL_SERVICES.find(s => s.label === desc);
+    setFormData(prev => ({
+      ...prev,
+      description: desc,
+      amount: match ? match.price : prev.amount
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,7 +554,8 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
 
     setIsSaving(true);
     try {
-      await addDoc(collection(db, 'payments'), {
+      const newPayment: any = {
+        id: `pay-${Date.now()}`,
         patientEmail: user.email,
         patientName: profile.name || user.displayName || 'Patient',
         amount: parseFloat(formData.amount),
@@ -504,8 +563,26 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
         status: 'completed',
         description: formData.description,
         method: formData.method,
-        timestamp: new Date()
-      });
+        timestamp: new Date().toISOString()
+      };
+
+      // Firestore if configured
+      try {
+        await addDoc(collection(db, 'payments'), {
+          ...newPayment,
+          timestamp: new Date()
+        });
+      } catch (e) {
+        // local fallback
+      }
+
+      // Save locally
+      const storedRaw = localStorage.getItem('raihan_dental_payments');
+      const stored = storedRaw ? JSON.parse(storedRaw) : DEFAULT_DENTAL_PAYMENTS;
+      stored.unshift(newPayment);
+      localStorage.setItem('raihan_dental_payments', JSON.stringify(stored));
+      window.dispatchEvent(new Event('raihan_payments_updated'));
+
       setSuccess(true);
       setTimeout(() => onClose(), 1500);
     } catch (error) {
@@ -524,8 +601,8 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
         className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
       >
         <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Make Payment</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Pay Dental Fee</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
             <X className="w-6 h-6 text-slate-400" />
           </button>
         </div>
@@ -537,11 +614,25 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h3 className="text-2xl font-bold text-slate-800">Payment Successful!</h3>
+              <p className="text-xs text-slate-500 font-medium">Dental invoice receipt generated.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Amount ($)</label>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">Dental Service</label>
+                <select
+                  value={formData.description}
+                  onChange={(e) => handleSelectService(e.target.value)}
+                  className="w-full p-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold transition-all"
+                >
+                  {DENTAL_SERVICES.map(s => (
+                    <option key={s.label} value={s.label}>{s.label} (${s.price})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">Fee Amount ($)</label>
                 <input
                   type="number"
                   required
@@ -549,23 +640,8 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
                   value={formData.amount}
                   onChange={(e) => setFormData({...formData, amount: e.target.value})}
                   placeholder="0.00"
-                  className="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  className="w-full p-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-black transition-all"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Description</label>
-                <select
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                >
-                  <option>Consultation Fee</option>
-                  <option>Medicine Purchase</option>
-                  <option>Lab Test Fee</option>
-                  <option>Insurance Premium</option>
-                  <option>Other</option>
-                </select>
               </div>
 
               <button

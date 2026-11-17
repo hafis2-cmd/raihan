@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Activity, 
   Users, 
   Calendar, 
   ArrowUpRight, 
@@ -9,34 +8,32 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Stethoscope, 
-  Store, 
-  Loader2, 
-  ClipboardList, 
+  FileText, 
+  CreditCard, 
+  Bell, 
   UserPlus, 
-  Video,
-  Crown,
-  ShieldCheck,
-  CreditCard,
-  Bell,
-  Trash2
+  Plus, 
+  Search, 
+  CalendarPlus, 
+  ShieldCheck, 
+  ChevronRight,
+  Smile,
+  CheckCheck
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useConfirmation } from '../context/ConfirmationContext';
-import { db } from '../firebase';
 import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  addDoc, 
-  deleteDoc 
-} from 'firebase/firestore';
+  Appointment, 
+  getLocalAppointments, 
+  getLocalNotifications, 
+  SystemNotification 
+} from '../services/appointmentService';
+import { 
+  DentalConsultation, 
+  DentalPrescription, 
+  getLocalConsultations, 
+  getLocalPrescriptions 
+} from '../services/dentalService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -45,506 +42,463 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function Dashboard() {
-  const { profile, user, updateRole } = useAuth();
-  const { confirm } = useConfirmation();
-  const [recentDiagnoses, setRecentDiagnoses] = useState<any[]>([]);
-  const [recentAppointments, setRecentAppointments] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
+  const { profile } = useAuth();
+  const navigate = useNavigate();
 
-  const handleToggleConsultationAvailability = async () => {
-    if (!user || profile?.role !== 'Doctor' || !profile?.email) return;
+  const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist';
+
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [consultations, setConsultations] = useState<DentalConsultation[]>([]);
+  const [prescriptions, setPrescriptions] = useState<DentalPrescription[]>([]);
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [todayStr, setTodayStr] = useState(new Date().toISOString().split('T')[0]);
+
+  const loadData = () => {
+    const allAppts = getLocalAppointments();
+    const allConsultations = getLocalConsultations();
+    const allPrescriptions = getLocalPrescriptions();
     
-    setIsTogglingAvailability(true);
-    const newStatus = !profile.isOnline;
-    
-    try {
-      const userRef = doc(db, 'users', user.uid || user.id);
-      await updateDoc(userRef, {
-        isOnline: newStatus,
-        lastSeen: new Date().toISOString()
-      });
-
-      profile.isOnline = newStatus;
-
-      const todayStr = new Date().toISOString().split('T')[0];
-      const slotsRef = collection(db, 'slots');
-      
-      if (newStatus) {
-        const qSlots = query(
-          slotsRef,
-          where('doctorEmail', '==', profile.email),
-          where('date', '==', todayStr)
-        );
-        const slotsSnapshot = await getDocs(qSlots);
-        
-        if (slotsSnapshot.empty) {
-          const now = new Date();
-          const currentHour = now.getHours();
-          
-          for (let i = 1; i <= 3; i++) {
-            const nextHour = (currentHour + i) % 24;
-            const ampm = nextHour >= 12 ? 'PM' : 'AM';
-            const h12 = nextHour % 12 || 12;
-            const formattedTime = `${h12.toString().padStart(2, '0')}:00 ${ampm}`;
-            
-            await addDoc(slotsRef, {
-              doctorEmail: profile.email,
-              doctorName: profile.name || profile.email.split('@')[0],
-              date: todayStr,
-              time: formattedTime,
-              isAvailable: true,
-              timestamp: new Date()
-            });
-          }
-        } else {
-          for (const d of slotsSnapshot.docs) {
-            await updateDoc(doc(db, 'slots', d.id), {
-              isAvailable: true
-            });
-          }
-        }
+    if (profile?.email) {
+      const emailLower = profile.email.toLowerCase().trim();
+      if (isDentist) {
+        setAppointments(allAppts.filter(a => (a.doctor_email || '').toLowerCase().trim() === emailLower || isDentist));
+        setConsultations(allConsultations.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower || isDentist));
+        setPrescriptions(allPrescriptions.filter(p => (p.dentist_email || '').toLowerCase().trim() === emailLower || isDentist));
       } else {
-        const qSlots = query(
-          slotsRef,
-          where('doctorEmail', '==', profile.email),
-          where('date', '==', todayStr),
-          where('isAvailable', '==', true)
-        );
-        const slotsSnapshot = await getDocs(qSlots);
-
-        for (const d of slotsSnapshot.docs) {
-          await deleteDoc(doc(db, 'slots', d.id));
-        }
+        setAppointments(allAppts.filter(a => (a.patient_email || '').toLowerCase().trim() === emailLower));
+        setConsultations(allConsultations.filter(c => (c.patient_email || '').toLowerCase().trim() === emailLower));
+        setPrescriptions(allPrescriptions.filter(p => (p.patient_email || '').toLowerCase().trim() === emailLower));
       }
-    } catch (error) {
-      console.error("Error setting availability:", error);
-    } finally {
-      setIsTogglingAvailability(false);
+      setNotifications(getLocalNotifications(profile.email));
     }
   };
 
   useEffect(() => {
-    if (!profile?.email) return;
-
-    const qNotifs = query(
-      collection(db, 'notifications'),
-      where('recipientEmail', '==', profile.email),
-      orderBy('timestamp', 'desc'),
-      limit(5)
-    );
-    const unsubscribeNotifs = onSnapshot(qNotifs, (snapshot) => {
-      const notifs: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        notifs.push({
-          id: docSnap.id,
-          recipient_email: d.recipientEmail,
-          message: d.message,
-          notification_type: d.type,
-          created_at: d.timestamp ? d.timestamp.toDate().toISOString() : new Date().toISOString()
-        });
-      });
-      setNotifications(notifs);
-    }, (err) => {
-      console.error("Error listening to notifications:", err);
-    });
-
-    let unsubscribeApptsOrDiagnoses: () => void = () => {};
-
-    if (profile.role === 'Doctor') {
-      const qAppts = query(
-        collection(db, 'appointments'),
-        where('doctorEmail', '==', profile.email),
-        orderBy('timestamp', 'desc'),
-        limit(5)
-      );
-      unsubscribeApptsOrDiagnoses = onSnapshot(qAppts, (snapshot) => {
-        const appts: any[] = [];
-        snapshot.forEach((docSnap) => {
-          const a = docSnap.data();
-          appts.push({
-            id: docSnap.id,
-            patientEmail: a.patientEmail || a.patient_email,
-            patientName: a.patientName || a.patient_name,
-            date: a.date || a.appointment_date,
-            time: a.time || a.appointment_time,
-            status: a.status
-          });
-        });
-        setRecentAppointments(appts);
-        setIsLoading(false);
-      }, (err) => {
-        console.error("Error listening to appointments:", err);
-        setIsLoading(false);
-      });
-    } else {
-      const qDiagnoses = query(
-        collection(db, 'diagnoses'),
-        where('patientEmail', '==', profile.email),
-        orderBy('timestamp', 'desc'),
-        limit(20)
-      );
-      unsubscribeApptsOrDiagnoses = onSnapshot(qDiagnoses, (snapshot) => {
-        const data: any[] = [];
-        snapshot.forEach((docSnap) => {
-          data.push({ id: docSnap.id, ...docSnap.data() });
-        });
-
-        const uniqueData: any[] = [];
-        const seenKeys = new Set<string>();
-        
-        for (const item of data) {
-          const patientKey = (item.patientEmail || profile.email || '').toLowerCase().trim();
-          const conditionKey = (item.condition || '').toLowerCase().trim();
-          const compositeKey = `${patientKey}|${conditionKey}`;
-          
-          if (conditionKey && !seenKeys.has(compositeKey)) {
-            seenKeys.add(compositeKey);
-            uniqueData.push({
-              id: item.id,
-              condition: item.condition,
-              risk: item.risk,
-              explanation: item.explanation,
-              created_at: item.timestamp ? item.timestamp.toDate().toISOString() : new Date().toISOString()
-            });
-          }
-        }
-        setRecentDiagnoses(uniqueData.slice(0, 5));
-        setIsLoading(false);
-      }, (err) => {
-        console.error("Error listening to diagnoses:", err);
-        setIsLoading(false);
-      });
-    }
-
+    loadData();
+    const handleUpdate = () => loadData();
+    window.addEventListener('raihan_appointments_updated', handleUpdate);
+    window.addEventListener('raihan_consultations_updated', handleUpdate);
+    window.addEventListener('raihan_prescriptions_updated', handleUpdate);
+    window.addEventListener('raihan_notification_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
     return () => {
-      unsubscribeNotifs();
-      unsubscribeApptsOrDiagnoses();
+      window.removeEventListener('raihan_appointments_updated', handleUpdate);
+      window.removeEventListener('raihan_consultations_updated', handleUpdate);
+      window.removeEventListener('raihan_prescriptions_updated', handleUpdate);
+      window.removeEventListener('raihan_notification_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
     };
-  }, [profile?.email, profile?.role]);
+  }, [profile?.email, isDentist]);
 
-  const handleDeleteDiagnosis = async (id: string) => {
-    const isConfirmed = await confirm({
-      title: 'Delete Diagnosis Record',
-      message: 'Are you sure you want to delete this diagnosis record? This will permanently remove it from your medical assessment history.',
-      confirmLabel: 'Yes, Delete',
-      cancelLabel: 'Keep Record',
-      severity: 'danger'
-    });
-    if (!isConfirmed) return;
+  // Dentist metrics
+  const todayAppointments = appointments.filter(a => a.appointment_date === todayStr && a.status === 'ACCEPTED');
+  const pendingRequests = appointments.filter(a => a.status === 'PENDING');
+  const upcomingAppointments = appointments.filter(a => a.status === 'ACCEPTED' && a.appointment_date >= todayStr);
+  const uniquePatientEmails = new Set(appointments.map(a => a.patient_email).filter(Boolean));
+  consultations.forEach(c => { if (c.patient_email) uniquePatientEmails.add(c.patient_email); });
+  const totalRegisteredPatients = Math.max(uniquePatientEmails.size, 1);
 
-    try {
-      await deleteDoc(doc(db, 'diagnoses', id));
-      setRecentDiagnoses(prev => prev.filter(d => d.id !== id));
-    } catch (error) {
-      console.error("Error deleting diagnosis:", error);
-    }
-  };
-
-  const stats = profile?.role === 'Doctor' ? [
-    { label: 'Total Patients', value: '48', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: 'Today\'s Appts', value: '6', icon: Calendar, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'Pending Reports', value: '3', icon: ClipboardList, color: 'text-amber-500', bg: 'bg-amber-50' },
-  ] : [
-    { label: 'Health Score', value: '92%', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: 'Consultations', value: '12', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'Next Appt', value: 'Tomorrow', icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-50' },
-  ];
+  // Patient metrics
+  const nextConfirmedAppointment = appointments.find(a => a.status === 'ACCEPTED' && a.appointment_date >= todayStr);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8 pb-12">
+      
       {/* Welcome Banner */}
-      <div className="relative bg-emerald-600 rounded-3xl p-8 overflow-hidden text-white shadow-2xl shadow-emerald-100">
-        <div className="relative z-10 max-w-lg space-y-4">
-          <h2 className="text-3xl font-bold">Welcome back, {profile?.name || (profile?.email || 'User').split('@')[0]}!</h2>
-          <p className="text-emerald-50/80 leading-relaxed">
-            {profile?.role === 'Doctor' 
-              ? "Manage your appointments, view patient records, and provide expert medical consultations through our secure platform."
-              : "Your health is our priority. Schedule appointments with top doctors, manage digital prescriptions, message your physician, and track your medical records seamlessly."}
+      <div className="relative bg-gradient-to-r from-emerald-600 to-teal-700 rounded-[2.5rem] p-8 sm:p-10 overflow-hidden text-white shadow-xl shadow-emerald-100">
+        <div className="relative z-10 max-w-xl space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-emerald-100 text-xs font-black uppercase tracking-wider border border-white/20">
+            <span>🦷 Raihan Dental Clinic</span>
+            <span>•</span>
+            <span>{isDentist ? 'Dentist Workspace' : 'Patient Dental Care'}</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
+            Welcome back, {profile?.name || (profile?.email || 'User').split('@')[0]}!
+          </h2>
+          
+          <p className="text-emerald-50/90 leading-relaxed text-sm md:text-base font-medium">
+            {isDentist 
+              ? 'Review pending dental requests, document patient consultations & treatments, manage clinical availability slots, and track dental billing.'
+              : 'Schedule dental appointments, review clinical treatments, check dental prescriptions, and track your oral healthcare journey.'}
           </p>
-          <div className="flex gap-3 pt-2">
-            {profile?.role === 'Doctor' ? (
-              <Link to="/appointments" className="px-6 py-2.5 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 transition-all flex items-center gap-2">
-                View Schedule
-                <Calendar className="w-4 h-4" />
-              </Link>
+
+          <div className="flex flex-wrap gap-3 pt-2">
+            {isDentist ? (
+              <>
+                <Link 
+                  to="/appointments" 
+                  className="px-6 py-3 bg-white text-emerald-700 rounded-2xl font-bold text-xs hover:bg-emerald-50 transition-all flex items-center gap-2 shadow-md"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Review Appointment Requests ({pendingRequests.length})</span>
+                </Link>
+                <Link 
+                  to="/consultations" 
+                  className="px-5 py-3 bg-white/15 hover:bg-white/25 text-white rounded-2xl font-bold text-xs transition-all flex items-center gap-2 border border-white/25"
+                >
+                  <Stethoscope className="w-4 h-4" />
+                  <span>Record Dental Consultation</span>
+                </Link>
+              </>
             ) : (
-              <Link to="/appointments" className="px-6 py-2.5 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 transition-all flex items-center gap-2">
-                Book Appointment
-                <Calendar className="w-4 h-4" />
-              </Link>
+              <>
+                <Link 
+                  to="/appointments" 
+                  className="px-6 py-3 bg-white text-emerald-700 rounded-2xl font-bold text-xs hover:bg-emerald-50 transition-all flex items-center gap-2 shadow-md"
+                >
+                  <CalendarPlus className="w-4 h-4" />
+                  <span>Book Dental Appointment</span>
+                </Link>
+                <Link 
+                  to="/consultations" 
+                  className="px-5 py-3 bg-white/15 hover:bg-white/25 text-white rounded-2xl font-bold text-xs transition-all flex items-center gap-2 border border-white/25"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>My Dental Records</span>
+                </Link>
+              </>
             )}
           </div>
         </div>
+
         {/* Abstract Background Shapes */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-        <div className="absolute bottom-0 right-20 w-32 h-32 bg-emerald-400/20 rounded-full translate-y-1/2 blur-2xl" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-16 w-48 h-48 bg-teal-400/20 rounded-full translate-y-1/3 blur-2xl pointer-events-none" />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, i) => (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            key={stat.label}
-            className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4"
-          >
-            <div className={`w-12 h-12 ${stat.bg} rounded-xl flex items-center justify-center`}>
-              <stat.icon className={`w-6 h-6 ${stat.color}`} />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">{stat.label}</p>
-              <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <h3 className="text-xl font-bold text-slate-800">
-                {profile?.role === 'Doctor' ? 'Upcoming Appointments' : 'Recent Clinical Records'}
-              </h3>
-              <Link to={profile?.role === 'Doctor' ? '/appointments' : '/prescriptions'} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">View All</Link>
-            </div>
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[200px]">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-48">
-                  <Loader2 className="w-8 h-8 text-slate-200 animate-spin" />
-                </div>
-              ) : profile?.role === 'Doctor' ? (
-                recentAppointments.length > 0 ? (
-                  recentAppointments.map((app, i) => (
-                    <div 
-                      key={app.id} 
-                      className={`p-5 flex items-center justify-between hover:bg-slate-50 transition-all ${i !== recentAppointments.length - 1 ? 'border-b border-slate-100' : ''}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
-                          <Calendar className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-800">{(app.patientEmail || 'Patient').split('@')[0]}</p>
-                          <p className="text-xs text-slate-500">{app.date} • {app.time}</p>
-                        </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${app.status === 'booked' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {app.status}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-                    <Calendar className="w-12 h-12 mb-2 opacity-20" />
-                    <p>No upcoming appointments.</p>
-                  </div>
-                )
-              ) : recentDiagnoses.length > 0 ? (
-                recentDiagnoses.map((activity, i) => (
-                  <div 
-                    key={activity.id} 
-                    className={`p-5 flex items-center justify-between hover:bg-slate-50 transition-all ${i !== recentDiagnoses.length - 1 ? 'border-b border-slate-100' : ''}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
-                        <Stethoscope className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-800">{activity.condition}</p>
-                        <p className="text-xs text-slate-500">Clinical Record • {activity.created_at ? new Date(activity.created_at).toLocaleDateString() : ''}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700`}>
-                        {activity.risk}% Confidence
-                      </span>
-                      <button
-                        onClick={() => handleDeleteDiagnosis(activity.id)}
-                        className="p-1.5 border border-slate-100 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl transition-all cursor-pointer"
-                        title="Delete Diagnosis Record"
-                        id={`delete-diag-${activity.id}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-                  <Stethoscope className="w-12 h-12 mb-2 opacity-20" />
-                  <p>No recent diagnoses found.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Notifications Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <h3 className="text-xl font-bold text-slate-800">Recent Notifications</h3>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Reminders & Alerts</span>
-            </div>
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              {notifications.length > 0 ? (
-                notifications.map((notif, i) => (
-                  <div 
-                    key={notif.id} 
-                    className={`p-5 flex items-start gap-4 hover:bg-slate-50 transition-all ${i !== notifications.length - 1 ? 'border-b border-slate-100' : ''}`}
-                  >
-                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">
-                      <Bell className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800">{notif.message}</p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <p className="text-[10px] text-slate-400 font-medium">{notif.created_at ? new Date(notif.created_at).toLocaleString() : ''}</p>
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">
-                          {notif.sent_via?.join(' & ')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center h-32 text-slate-400">
-                  <Bell className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-sm">No recent notifications.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Health Tips / Quick Actions */}
-        <div className="space-y-4">
-          <h3 className="text-xl font-bold text-slate-800 px-2">
-            {profile?.role === 'Doctor' ? 'Quick Actions' : 'Daily Health Tip'}
-          </h3>
+      {/* ========================================================== */}
+      {/* DENTIST DASHBOARD VIEW                                     */}
+      {/* ========================================================== */}
+      {isDentist ? (
+        <div className="space-y-8">
           
-          {/* Subscription Status Card */}
-          <div className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden shadow-xl shadow-slate-200">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-bl-full -mr-8 -mt-8 blur-2xl" />
-            <div className="relative z-10 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                  <Crown className={cn("w-5 h-5", profile?.subscribed ? "text-amber-400" : "text-slate-400")} />
-                </div>
-                {profile?.subscribed ? (
-                  <span className="text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
-                ) : (
-                  <span className="text-[10px] font-black bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full uppercase tracking-widest">Free Plan</span>
-                )}
+          {/* Key Metrics Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0 border border-emerald-100">
+                <Calendar className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-bold text-lg">Patient Care Portal</h4>
-                <p className="text-xs text-slate-400 font-medium">
-                  Direct clinical access to appointments, medical prescriptions, and private communication.
-                </p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Visits</p>
+                <h4 className="text-2xl font-black text-slate-800">{todayAppointments.length}</h4>
+                <p className="text-[10px] text-emerald-600 font-bold">Confirmed today</p>
               </div>
-              <Link 
-                to="/appointments" 
-                className="w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-900/20"
-              >
-                Schedule Consultation
-                <ArrowUpRight className="w-3 h-3" />
-              </Link>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 border border-amber-100">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Requests</p>
+                <h4 className="text-2xl font-black text-slate-800">{pendingRequests.length}</h4>
+                <p className="text-[10px] text-amber-600 font-bold">Requires decision</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0 border border-blue-100">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Upcoming Visits</p>
+                <h4 className="text-2xl font-black text-slate-800">{upcomingAppointments.length}</h4>
+                <p className="text-[10px] text-blue-600 font-bold">Locked in calendar</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0 border border-purple-100">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Patients</p>
+                <h4 className="text-2xl font-black text-slate-800">{totalRegisteredPatients}</h4>
+                <p className="text-[10px] text-purple-600 font-bold">Registered dental care</p>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Quick Access Menu Cards */}
+          <div className="space-y-3">
+            <h3 className="text-base font-black text-slate-800 tracking-tight">Quick Clinic Actions</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { label: 'Manage Slots', icon: Clock, path: '/appointments', color: 'text-emerald-600 bg-emerald-50' },
+                { label: 'Requests', icon: CalendarPlus, path: '/appointments', color: 'text-amber-600 bg-amber-50', badge: pendingRequests.length },
+                { label: 'My Patients', icon: Users, path: '/patients', color: 'text-blue-600 bg-blue-50' },
+                { label: 'Consultations', icon: Stethoscope, path: '/consultations', color: 'text-teal-600 bg-teal-50' },
+                { label: 'Prescriptions', icon: FileText, path: '/prescriptions', color: 'text-indigo-600 bg-indigo-50' },
+                { label: 'Payments', icon: CreditCard, path: '/payments', color: 'text-rose-600 bg-rose-50' },
+              ].map((item, idx) => (
+                <Link
+                  key={idx}
+                  to={item.path}
+                  className="bg-white p-4 rounded-2xl border border-slate-200/90 hover:border-emerald-500 hover:shadow-md transition-all flex flex-col items-center text-center gap-2 group cursor-pointer relative"
+                >
+                  {item.badge && item.badge > 0 ? (
+                    <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[9px] font-black">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105", item.color)}>
+                    <item.icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700">{item.label}</span>
+                </Link>
+              ))}
             </div>
           </div>
 
-          {profile?.role === 'Doctor' ? (
-            <div className="space-y-6">
-              {/* Availability Quick Toggle Card */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-sm">Consultation Status</h4>
-                    <p className="text-[11px] text-slate-400 font-medium">Toggle quick availability status</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "w-2 h-2 rounded-full",
-                      profile?.isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
-                    )} />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                      {profile?.isOnline ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
+          {/* Two Columns: Pending Requests & Recent Consultations */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Column 1: Incoming Patient Requests */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                  <h4 className="font-black text-slate-800 text-base">Pending Appointment Requests</h4>
                 </div>
+                <Link to="/appointments" className="text-xs font-bold text-emerald-600 hover:text-emerald-700">
+                  View All ({pendingRequests.length})
+                </Link>
+              </div>
 
-                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <div className="flex-1 pr-2">
-                    <span className="text-xs font-bold text-slate-700 block">Available instantly</span>
-                    <span className="text-[10px] text-slate-400 block font-medium leading-relaxed">
-                      {profile?.isOnline ? "Hourly slots registered for today" : "No active consultation slots"}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isTogglingAvailability}
-                    onClick={handleToggleConsultationAvailability}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2",
-                      profile?.isOnline ? "bg-emerald-500" : "bg-slate-200",
-                      isTogglingAvailability ? "opacity-50 cursor-not-allowed" : ""
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out flex items-center justify-center",
-                        profile?.isOnline ? "translate-x-5" : "translate-x-0"
-                      )}
-                    >
-                      {isTogglingAvailability && (
-                        <Loader2 className="w-2.5 h-2.5 text-emerald-500 animate-spin" />
-                      )}
-                    </span>
-                  </button>
+              {pendingRequests.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                  <CheckCheck className="w-8 h-8 text-emerald-500 mx-auto opacity-60" />
+                  <p className="font-bold text-slate-600">No pending requests</p>
+                  <p className="text-[11px]">All incoming patient requests have been reviewed.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingRequests.slice(0, 3).map(app => (
+                    <div key={app.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
+                      <div>
+                        <h5 className="font-bold text-slate-800">{app.patient_name}</h5>
+                        <p className="text-[11px] text-slate-500">{app.appointment_date} at {app.appointment_time}</p>
+                        <p className="text-[10px] text-emerald-700 font-semibold italic mt-0.5">"{app.reason}"</p>
+                      </div>
+                      <Link
+                        to="/appointments"
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[11px] shadow-xs shrink-0"
+                      >
+                        Review
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Column 2: Recent Dental Consultations */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-teal-600" />
+                  <h4 className="font-black text-slate-800 text-base">Recent Dental Consultations</h4>
+                </div>
+                <Link to="/consultations" className="text-xs font-bold text-emerald-600 hover:text-emerald-700">
+                  All Records ({consultations.length})
+                </Link>
+              </div>
+
+              {consultations.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="font-bold text-slate-600">No consultations recorded yet</p>
+                  <p className="text-[11px]">Recorded patient procedures will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {consultations.slice(0, 3).map(c => (
+                    <div key={c.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h5 className="font-bold text-slate-800">{c.patient_name}</h5>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
+                            {c.treatment_category}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">{c.consultation_date} • {c.diagnosis}</p>
+                      </div>
+                      <Link
+                        to="/consultations"
+                        className="p-2 hover:bg-slate-200 text-slate-600 rounded-xl"
+                        title="View details"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      ) : (
+        /* ========================================================== */
+        /* PATIENT DASHBOARD VIEW                                     */
+        /* ========================================================== */
+        <div className="space-y-8">
+          
+          {/* Next Confirmed Dental Appointment Banner */}
+          {nextConfirmedAppointment ? (
+            <div className="bg-white p-6 sm:p-7 rounded-3xl border border-emerald-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0 border border-emerald-100">
+                  <Calendar className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Next Confirmed Dental Visit
+                  </span>
+                  <h4 className="text-lg font-black text-slate-800 mt-1">
+                    Dr. {nextConfirmedAppointment.doctor_name} ({nextConfirmedAppointment.doctor_specialty || 'Chief Dental Surgeon'})
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium">
+                    📅 {nextConfirmedAppointment.appointment_date} at {nextConfirmedAppointment.appointment_time} • 📍 {nextConfirmedAppointment.location}
+                  </p>
                 </div>
               </div>
 
-              {/* Standard Quick Links */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <Link to="/prescriptions" className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-emerald-100 transition-all">
-                  <ClipboardList className="w-5 h-5" />
-                  Write Prescription
-                </Link>
-                <Link to="/patients" className="w-full py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-indigo-100 transition-all">
-                  <Users className="w-5 h-5" />
-                  Manage Patients
-                </Link>
-                {/* <Link to="/consultation" className="w-full py-4 bg-blue-50 text-blue-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-100 transition-all">
-                  <Video className="w-5 h-5" />
-                  Start Video Call
-                </Link> */}
-              </div>
+              <Link
+                to="/appointments"
+                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-sm shrink-0 self-start md:self-auto"
+              >
+                View Visit Details
+              </Link>
             </div>
           ) : (
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <Link to="/appointments" className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-emerald-100 transition-all">
-                <Calendar className="w-5 h-5" />
-                Book Appointment
-              </Link>
-              <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500">
-                <AlertCircle className="w-6 h-6" />
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
+                  <CalendarPlus className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm">Need a Dental Checkup?</h4>
+                  <p className="text-xs text-slate-400">Schedule your routine cleaning, examination, or pain evaluation.</p>
+                </div>
               </div>
-              <h4 className="text-lg font-bold text-slate-800">Stay Hydrated!</h4>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Drinking at least 8 glasses of water a day helps maintain your energy levels and improves brain function.
-              </p>
-              <button className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-semibold hover:bg-slate-100 transition-all">
-                Learn More
-              </button>
+              <Link
+                to="/appointments"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 self-start sm:self-auto"
+              >
+                Find & Book Dentist
+              </Link>
             </div>
           )}
+
+          {/* Patient Quick Actions */}
+          <div className="space-y-3">
+            <h3 className="text-base font-black text-slate-800 tracking-tight">Your Dental Portal</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Book Dentist', icon: CalendarPlus, path: '/appointments', color: 'text-emerald-600 bg-emerald-50' },
+                { label: 'Dental Records', icon: Stethoscope, path: '/consultations', color: 'text-teal-600 bg-teal-50', badge: consultations.length },
+                { label: 'Prescriptions', icon: FileText, path: '/prescriptions', color: 'text-indigo-600 bg-indigo-50', badge: prescriptions.length },
+                { label: 'Dental Billing', icon: CreditCard, path: '/payments', color: 'text-amber-600 bg-amber-50' },
+              ].map((item, idx) => (
+                <Link
+                  key={idx}
+                  to={item.path}
+                  className="bg-white p-4 rounded-2xl border border-slate-200/90 hover:border-emerald-500 hover:shadow-md transition-all flex flex-col items-center text-center gap-2 group cursor-pointer relative"
+                >
+                  {item.badge && item.badge > 0 ? (
+                    <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-emerald-500 text-white rounded-full text-[9px] font-black">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105", item.color)}>
+                    <item.icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Patient Two Columns: Recent Dental Treatments & Prescriptions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Dental History Column */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-emerald-600" />
+                  <h4 className="font-black text-slate-800 text-base">Recent Dental Treatments</h4>
+                </div>
+                <Link to="/consultations" className="text-xs font-bold text-emerald-600 hover:text-emerald-700">
+                  View All
+                </Link>
+              </div>
+
+              {consultations.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                  <p className="font-bold text-slate-600">No consultation records</p>
+                  <p className="text-[11px]">When your dentist completes a visit, records will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {consultations.slice(0, 3).map(c => (
+                    <div key={c.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800">{c.treatment_category}</span>
+                        <span className="text-slate-400 text-[10px]">{c.consultation_date}</span>
+                      </div>
+                      <p className="text-slate-600 font-medium">Diagnosis: <strong>{c.diagnosis}</strong></p>
+                      <p className="text-[11px] text-emerald-700 italic">Performed: {c.treatment_performed}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Prescriptions Column */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <h4 className="font-black text-slate-800 text-base">Dental Prescriptions</h4>
+                </div>
+                <Link to="/prescriptions" className="text-xs font-bold text-emerald-600 hover:text-emerald-700">
+                  View Prescriptions
+                </Link>
+              </div>
+
+              {prescriptions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                  <p className="font-bold text-slate-600">No prescriptions issued</p>
+                  <p className="text-[11px]">Prescriptions issued by your dentist will be saved here.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {prescriptions.slice(0, 3).map(p => (
+                    <div key={p.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800">Issued by {p.dentist_name}</span>
+                        <span className="text-slate-400 text-[10px]">{p.prescription_date}</span>
+                      </div>
+                      <p className="text-slate-600 font-medium text-[11px]">
+                        Medications: {p.medications.map(m => m.medicine_name).join(', ')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
         </div>
-      </div>
+      )}
+
     </div>
   );
 }

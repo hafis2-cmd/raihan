@@ -19,7 +19,7 @@ import { ADMIN_EMAIL } from '../constants';
 
 export interface UserProfile {
   email: string;
-  role: 'Patient' | 'Doctor' | 'Admin';
+  role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin';
   subscribed: boolean;
   newsletter?: boolean;
   createdAt: any;
@@ -42,6 +42,7 @@ export interface UserProfile {
   address?: string;
   allergies?: string;
   medicalHistory?: string;
+  dentalHistory?: string;
   currentMedications?: string;
   chronicConditions?: string;
   emergencyContactName?: string;
@@ -50,7 +51,7 @@ export interface UserProfile {
   insuranceProvider?: string;
   insurancePolicyNumber?: string;
 
-  // Doctor-specific accurate fields
+  // Dentist-specific accurate fields
   specialty?: string;
   subSpecialty?: string;
   licenseNumber?: string;
@@ -69,11 +70,11 @@ interface AuthContextType {
   loading: boolean;
   isFirebaseConfigured: boolean;
   login: () => Promise<void>;
-  loginAsDemo: (role: 'Doctor' | 'Patient' | 'Admin') => Promise<void>;
+  loginAsDemo: (role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin') => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  signupWithEmail: (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Admin') => Promise<void>;
+  signupWithEmail: (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => Promise<void>;
   logout: () => Promise<void>;
-  updateRole: (role: 'Patient' | 'Doctor' | 'Admin') => Promise<void>;
+  updateRole: (role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => Promise<void>;
   updateProfile: (updatedData: Partial<UserProfile>) => Promise<void>;
   googleToken: string | null;
   connectGoogleCalendar: () => Promise<string | null>;
@@ -81,7 +82,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getStoredProfile = (email: string, role: 'Doctor' | 'Patient' | 'Admin'): UserProfile => {
+const getStoredProfile = (email: string, role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin'): UserProfile => {
   const emailKey = `raihan_profile_${email.toLowerCase().trim()}`;
   const stored = localStorage.getItem(emailKey);
   if (stored) {
@@ -93,23 +94,23 @@ const getStoredProfile = (email: string, role: 'Doctor' | 'Patient' | 'Admin'): 
     }
   }
 
-  if (role === 'Doctor') {
+  if (role === 'Doctor' || role === 'Dentist') {
     return {
       email,
-      role: 'Doctor',
-      name: 'Dr. Raihan (MD)',
+      role: 'Dentist',
+      name: 'Dr. Raihan (BDS, MDS)',
       subscribed: true,
       phone: '+1 (555) 234-5678',
-      specialty: 'Cardiologist & General Tele-Consultant',
-      subSpecialty: 'Preventive Cardiology & Internal Medicine',
-      licenseNumber: 'RMC-84920-IN',
-      education: 'MBBS, MD (General Medicine), FACC',
+      specialty: 'Chief Dental Surgeon',
+      subSpecialty: 'Endodontics & Restorative Dentistry',
+      licenseNumber: 'RDC-84920-DEN',
+      education: 'BDS, MDS (Oral & Maxillofacial Surgery)',
       experience: 12,
-      location: 'Raihan Central Hospital, Suite 402',
-      hospitalAffiliation: 'Raihan Healthcare Network',
+      location: 'Raihan Dental Clinic, Suite 101',
+      hospitalAffiliation: 'Raihan Dental Health Center',
       consultationFee: 50,
       workingHours: '09:00 AM - 05:00 PM, Mon-Sat',
-      bio: 'Board-certified clinical specialist with over 12 years of clinical practice and digital telemedicine consultation experience. Specializing in cardiovascular prevention and evidence-based medicine.',
+      bio: 'Chief Dental Surgeon with over 12 years of specialized practice in restorative dentistry, root canals, cosmetic smile enhancements, and oral health.',
       isOnline: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -128,15 +129,16 @@ const getStoredProfile = (email: string, role: 'Doctor' | 'Patient' | 'Admin'): 
       weight: '72 kg',
       phone: '+1 (555) 876-5432',
       address: '742 Evergreen Terrace, Sector 4, Metro City',
-      allergies: 'Penicillin, Dust pollen (mild)',
+      allergies: 'Penicillin (mild), Local Anesthetic (None)',
       medicalHistory: 'Appendectomy (2018). Occasional seasonal allergy symptoms.',
-      currentMedications: 'Cetirizine 10mg as needed, Vitamin D3 (60K IU weekly)',
+      dentalHistory: 'Routine dental scaling 6 months ago. Mild sensitivity on cold beverages.',
+      currentMedications: 'None currently',
       chronicConditions: 'None reported',
       emergencyContactName: 'Jane Doe',
       emergencyContactPhone: '+1 (555) 987-6543',
       emergencyContactRelation: 'Spouse',
-      insuranceProvider: 'BlueShield Healthcare',
-      insurancePolicyNumber: 'BS-9948271-X',
+      insuranceProvider: 'DentalCare Premier',
+      insurancePolicyNumber: 'DC-9948271-X',
       isOnline: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -300,19 +302,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginAsDemo = async (role: 'Doctor' | 'Patient' | 'Admin') => {
+  const loginAsDemo = async (role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin') => {
     setLoading(true);
+    const isDentistRole = role === 'Doctor' || role === 'Dentist';
     const email = role === 'Admin' 
       ? ADMIN_EMAIL 
-      : (role === 'Doctor' ? 'dr.raihan@telemed.com' : 'patient@telemed.com');
+      : (isDentistRole ? 'dr.raihan@telemed.com' : 'patient@telemed.com');
 
     // Retrieve stored profile for this email so previous edits are retained
-    const demoProfile = getStoredProfile(email, role);
+    const demoProfile = getStoredProfile(email, isDentistRole ? 'Dentist' : role);
 
     const demoUser = {
-      uid: `demo-${role.toLowerCase()}-001`,
+      uid: `demo-${(isDentistRole ? 'dentist' : role).toLowerCase()}-001`,
       email,
-      displayName: demoProfile.name || (role === 'Doctor' ? 'Dr. Raihan (MD)' : 'John Doe'),
+      displayName: demoProfile.name || (isDentistRole ? 'Dr. Raihan (BDS, MDS)' : 'John Doe'),
     };
 
     localStorage.setItem('raihan_active_user', JSON.stringify(demoUser));
@@ -436,7 +439,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setGoogleToken(null);
   };
 
-  const updateRole = async (role: 'Patient' | 'Doctor' | 'Admin') => {
+  const updateRole = async (role: 'Patient' | 'Doctor' | 'Dentist' | 'Admin') => {
     if (!user) return;
     setLoading(true);
     const finalRole = user.email === ADMIN_EMAIL ? 'Admin' : role;

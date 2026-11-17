@@ -19,7 +19,7 @@ import {
 
 export default function Login() {
   const { login, loginAsDemo, isFirebaseConfigured, loginWithEmail, signupWithEmail, user, profile, updateRole, loading } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<'Patient' | 'Doctor' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'Patient' | 'Doctor' | 'Dentist' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState<'google' | 'login' | 'signup'>('google');
   const [email, setEmail] = useState('');
@@ -27,7 +27,7 @@ export default function Login() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
-  const handleDemoAccess = async (role: 'Doctor' | 'Patient' | 'Admin') => {
+  const handleDemoAccess = async (role: 'Doctor' | 'Dentist' | 'Patient') => {
     setIsSubmitting(true);
     setError('');
     try {
@@ -44,14 +44,13 @@ export default function Login() {
     setIsSubmitting(true);
     setError('');
     try {
-      // If email matches admin, force Admin role, otherwise use selectedRole
-      const finalRole = user?.email === ADMIN_EMAIL ? 'Admin' : selectedRole;
+      const finalRole = selectedRole === 'Doctor' ? 'Dentist' : selectedRole;
       if (!finalRole) {
-        setError('Please select a role');
+        setError('Please select your role');
         setIsSubmitting(false);
         return;
       }
-      await updateRole(finalRole as 'Patient' | 'Doctor' | 'Admin');
+      await updateRole(finalRole as 'Patient' | 'Dentist');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to complete setup. Please try again.');
@@ -112,55 +111,46 @@ export default function Login() {
           className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200 max-w-md w-full text-center space-y-8"
         >
           <div className="space-y-2">
-            <h2 className="text-3xl font-bold text-slate-800">Welcome!</h2>
-            <p className="text-slate-500">
-              {isAdminEmail ? 'You are recognized as an Administrator.' : 'Please select your role to continue.'}
+            <h2 className="text-3xl font-black text-slate-800">Welcome to Raihan Dental!</h2>
+            <p className="text-slate-500 font-medium text-sm">
+              Please select your role to access the dental portal.
             </p>
           </div>
 
-          {!isAdminEmail ? (
-            <div className="grid grid-cols-2 gap-4">
-              {error && (
-                <div className="col-span-2 p-4 bg-rose-50 text-rose-600 text-sm font-medium rounded-2xl border border-rose-100 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {error}
-                </div>
-              )}
-              <button
-                onClick={() => setSelectedRole('Patient')}
-                disabled={isSubmitting}
-                className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${selectedRole === 'Patient' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-emerald-200'} ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedRole === 'Patient' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <User className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-slate-700">Patient</span>
-              </button>
-
-              <button
-                onClick={() => setSelectedRole('Doctor')}
-                disabled={isSubmitting}
-                className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${selectedRole === 'Doctor' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-emerald-200'} ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedRole === 'Doctor' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <Stethoscope className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-slate-700">Doctor</span>
-              </button>
-            </div>
-          ) : (
-            <div className="p-6 rounded-2xl border-2 border-indigo-500 bg-indigo-50 flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500 text-white flex items-center justify-center">
-                <Shield className="w-6 h-6" />
+          <div className="grid grid-cols-2 gap-4">
+            {error && (
+              <div className="col-span-2 p-4 bg-rose-50 text-rose-600 text-sm font-medium rounded-2xl border border-rose-100 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {error}
               </div>
-              <span className="font-bold text-indigo-700">Administrator</span>
-            </div>
-          )}
+            )}
+            <button
+              onClick={() => setSelectedRole('Dentist')}
+              disabled={isSubmitting}
+              className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${selectedRole === 'Dentist' || selectedRole === 'Doctor' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-emerald-200'} ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedRole === 'Dentist' || selectedRole === 'Doctor' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <Stethoscope className="w-6 h-6" />
+              </div>
+              <span className="font-bold text-slate-700">Dentist</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedRole('Patient')}
+              disabled={isSubmitting}
+              className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${selectedRole === 'Patient' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-emerald-200'} ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedRole === 'Patient' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <User className="w-6 h-6" />
+              </div>
+              <span className="font-bold text-slate-700">Patient</span>
+            </button>
+          </div>
 
           <button
-            disabled={(!selectedRole && !isAdminEmail) || isSubmitting}
+            disabled={!selectedRole || isSubmitting}
             onClick={handleCompleteSetup}
-            className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
+            className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer"
           >
             {isSubmitting ? (
               <>
@@ -168,7 +158,7 @@ export default function Login() {
                 Completing...
               </>
             ) : (
-              'Complete Setup'
+              'Enter Dental Portal'
             )}
           </button>
         </motion.div>
@@ -194,8 +184,8 @@ export default function Login() {
           </div>
           
           <div className="space-y-2">
-            <h1 className="text-4xl font-black text-slate-800 tracking-tight">Raihan</h1>
-            <p className="text-slate-500 font-medium">Telemedicine & Healthcare System</p>
+            <h1 className="text-4xl font-black text-slate-800 tracking-tight">Raihan Dental Clinic</h1>
+            <p className="text-emerald-600 font-bold text-sm tracking-wide uppercase">Dental Clinic Management System</p>
           </div>
 
           <div className="w-full space-y-4">
@@ -291,17 +281,17 @@ export default function Login() {
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
+                        onClick={() => setSelectedRole('Dentist')}
+                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${selectedRole === 'Dentist' || selectedRole === 'Doctor' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}
+                      >
+                        Dentist
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setSelectedRole('Patient')}
                         className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${selectedRole === 'Patient' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}
                       >
                         Patient
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRole('Doctor')}
-                        className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${selectedRole === 'Doctor' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}
-                      >
-                        Doctor
                       </button>
                     </div>
                   </div>
@@ -339,45 +329,41 @@ export default function Login() {
               </form>
             )}
 
-            {/* Quick Instant Access for Development & Testing */}
+            {/* Quick Instant Access for Dental Clinic Roles */}
             <div className="w-full pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Quick Portal Access</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Dev Ready</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Quick Clinic Access</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Dental Demo</span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => handleDemoAccess('Doctor')}
+                  onClick={() => handleDemoAccess('Dentist')}
                   disabled={isSubmitting}
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all flex flex-col items-center gap-1.5 group cursor-pointer"
+                  className="p-3.5 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all flex items-center gap-3 group cursor-pointer text-left"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Stethoscope className="w-4 h-4" />
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <Stethoscope className="w-5 h-5" />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700">Doctor</span>
+                  <div>
+                    <span className="text-xs font-black text-slate-800 block">Dentist Access</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Dr. Raihan (BDS, MDS)</span>
+                  </div>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => handleDemoAccess('Patient')}
                   disabled={isSubmitting}
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center gap-1.5 group cursor-pointer"
+                  className="p-3.5 rounded-2xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all flex items-center gap-3 group cursor-pointer text-left"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <User className="w-4 h-4" />
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <User className="w-5 h-5" />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700">Patient</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDemoAccess('Admin')}
-                  disabled={isSubmitting}
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 transition-all flex flex-col items-center gap-1.5 group cursor-pointer"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Shield className="w-4 h-4" />
+                  <div>
+                    <span className="text-xs font-black text-slate-800 block">Patient Access</span>
+                    <span className="text-[10px] text-slate-400 font-medium">John Doe</span>
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700">Admin</span>
                 </button>
               </div>
             </div>

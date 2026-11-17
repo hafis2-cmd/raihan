@@ -30,54 +30,59 @@ const FAQ_DATABASE: FAQItem[] = [
   // Appointments
   {
     category: 'appointments',
-    question: "How do I book an appointment with a doctor?",
-    answer: "Go to the Appointments page, select an available physician, choose your preferred date and time slot on the calendar, and confirm your booking. The appointment will instantly appear on your dashboard schedule."
+    question: "How do I book a dental appointment with the dentist?",
+    answer: "Go to the Appointments page, view Dr. Raihan's dental profile, select your preferred date and time slot from the clinic schedule, enter your dental complaint, and submit your request. The dentist will review and approve your appointment."
   },
   {
     category: 'appointments',
-    question: "Can I sync my appointment to Google Calendar?",
-    answer: "Yes! Each confirmed appointment card features a 'Sync' button that exports the session details, doctor information, and clinical location directly to your Google Calendar."
+    question: "Is my dental appointment confirmed immediately upon request?",
+    answer: "Appointment requests start with PENDING status. Only the dentist has the clinical authority to ACCEPT or REJECT requests. Once confirmed, you receive an instant notification with appointment details."
   },
   {
     category: 'appointments',
-    question: "How do I reschedule or cancel an appointment?",
-    answer: "Under the Appointments page, locate your appointment and click 'Cancel' to release the slot or choose a new time slot from the doctor's available calendar."
+    question: "Can I sync my confirmed appointment to Google Calendar?",
+    answer: "Yes! Each confirmed appointment card features a 'Sync' button that exports the dental visit details, dentist name, and clinic location directly to your Google Calendar."
+  },
+  {
+    category: 'appointments',
+    question: "How do I cancel a dental appointment?",
+    answer: "Under the Appointments page, locate your appointment and click 'Cancel' to release the reserved chair slot so another dental patient can book."
   },
 
   // Prescriptions
   {
     category: 'prescriptions',
-    question: "How do I print or download my digital prescription?",
-    answer: "Navigate to the Prescriptions tab, select any prescription record, and click 'Download PDF'. This generates an official Raihan Telemedicine printable prescription complete with medication dosages, instructions, and physician verification stamps."
+    question: "How do I print or download my dental prescription?",
+    answer: "Navigate to the Prescriptions tab, select any prescription, and click 'Download PDF'. This generates an official Raihan Dental Clinic printable prescription complete with dental medication dosages, instructions, and dental surgeon verification stamps."
   },
   {
     category: 'prescriptions',
-    question: "Can doctors issue digital prescriptions directly on the platform?",
-    answer: "Yes, licensed physicians can issue structured digital prescriptions with itemized medications, dosage schedules, duration, and clinical notes directly from the patient record or prescription portal."
+    question: "Can dentists issue digital dental prescriptions directly on the platform?",
+    answer: "Yes, registered dental surgeons can prescribe common dental antibiotics, analgesics, antiseptic mouth rinses, and oral pastes with itemized instructions directly from the patient dental chart."
   },
 
   // Messages
   {
     category: 'messages',
-    question: "Is patient-doctor messaging private and secure?",
-    answer: "Yes. All direct messages between patients and doctors are protected by encrypted database rules. You can safely discuss symptoms, follow-ups, and treatment progress in real-time."
+    question: "Is patient-dentist messaging private and secure?",
+    answer: "Yes. All direct messages between dental patients and dentists are protected by encrypted database rules. You can safely discuss post-op oral care, teeth sensitivity, or follow-up instructions."
   },
   {
     category: 'messages',
-    question: "Can I send medical files or photos in the chat?",
-    answer: "Yes! The chat window supports attaching images and medical files so your doctor can review prior test reports, lab results, or photo updates during your care."
+    question: "Can I send dental x-rays or clinical photos in the chat?",
+    answer: "Yes! The chat window supports attaching images and PDF files so your dentist can inspect dental radiographs, intraoral photos, or past treatment records."
   },
 
   // Billing & Payments
   {
     category: 'billing',
-    question: "How do I pay consultation fees?",
-    answer: "When a consultation is scheduled, an invoice appears in your Payments page. Click 'Pay Now' to complete your payment securely via digital cards or transfer."
+    question: "How do I pay dental consultation or procedure fees?",
+    answer: "When a dental consultation or treatment (e.g. Scaling, Root Canal, Crown) is recorded, an invoice appears in your Payments tab. Click 'Pay Now' to complete your payment securely."
   },
   {
     category: 'billing',
-    question: "Where do I get payment receipts for insurance claims?",
-    answer: "Every completed transaction in the Payments tab has a 'Download PDF Receipt' icon. Click it to print or save a formal invoice receipt with itemized charges and clinic verification."
+    question: "Where do I get dental treatment receipts for insurance claims?",
+    answer: "Every completed transaction in the Payments tab has a 'Download PDF Receipt' icon. Click it to print or save a formal Raihan Dental Clinic invoice receipt with itemized dental codes and clinic verification."
   }
 ];
 
@@ -144,8 +149,8 @@ export default function FloatingFAQ() {
                       <HelpCircle className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Raihan Telemedicine Help Center</h3>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Patient & Doctor Portal Guide</p>
+                      <h3 className="font-black text-slate-800 dark:text-slate-100 tracking-tight text-base sm:text-lg">Raihan Dental Clinic Help Center</h3>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Patient & Dentist Clinic Guide</p>
                     </div>
                   </div>
                   <button
@@ -159,7 +164,7 @@ export default function FloatingFAQ() {
                 {/* Sub-disclaimer info banner */}
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 p-3 rounded-2xl flex items-start gap-2 text-[10px] text-emerald-850 dark:text-emerald-400 font-semibold leading-relaxed">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>All your consultations, medical prescriptions, and private messages are encrypted and HIPAA-aligned.</span>
+                  <span>All your dental consultations, prescriptions, and private clinical records are securely retained.</span>
                 </div>
 
                 {/* Categories filtering tabs */}

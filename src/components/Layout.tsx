@@ -38,31 +38,24 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const getNavItems = (role: string, subscribed: boolean) => {
+  const isDentistRole = role === 'Doctor' || role === 'Dentist';
   const items = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    // { icon: Stethoscope, label: 'Diagnosis', path: '/diagnosis' },
-    { icon: UserCircle, label: role === 'Doctor' ? 'Doctor Profile' : 'Patient Profile', path: '/profile' },
-    { icon: MessageSquare, label: 'Messages', path: '/messages' },
+    { icon: UserCircle, label: isDentistRole ? 'Dentist Profile' : 'Patient Profile', path: '/profile' },
+    { icon: Stethoscope, label: 'Dental Consultations', path: '/consultations' },
     { icon: Calendar, label: 'Appointments', path: '/appointments' },
-    { icon: Users, label: 'My Patients', path: '/patients', doctorOnly: true },
-    // { icon: Video, label: 'Consultation', path: '/consultation' },
-    { icon: History, label: 'Call History', path: '/call-history' },
+    { icon: Users, label: 'My Patients', path: '/patients', dentistOnly: true },
     { icon: FileText, label: 'Prescriptions', path: '/prescriptions' },
-    // { icon: Store, label: 'Medical Store', path: '/store' },
     { icon: CreditCard, label: 'Payments', path: '/payments' },
-    // { icon: ShieldCheck, label: 'Subscription', path: '/subscription' },
-    // { icon: Users, label: 'Doctor Profiles', path: '/doctors' },
+    { icon: MessageSquare, label: 'Messages', path: '/messages' },
+    { icon: History, label: 'Call History', path: '/call-history' },
   ];
 
-  if (role === 'Admin') {
-    return items;
-  }
-
-  if (role === 'Doctor') {
+  if (isDentistRole || role === 'Admin') {
     return items;
   }
   
-  return items.filter(item => !item.doctorOnly);
+  return items.filter(item => !(item as any).dentistOnly);
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -158,7 +151,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 bg-emerald-600 dark:bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-100 dark:shadow-none">
               <Activity className="w-5 h-5 animate-pulse" />
             </div>
-            {isSidebarOpen && <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-slate-100">Raihan Telemedicine</span>}
+            {isSidebarOpen && <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-slate-100">Raihan Dental Clinic</span>}
           </div>
           {/* Close button inside sidebar on mobile only */}
           {isSidebarOpen && (
@@ -372,7 +365,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{profile?.role}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                {profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'Dentist' : (profile?.role || 'Patient')}
+              </p>
             </div>
             
             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-850 border-2 border-white dark:border-slate-850 shadow-xs overflow-hidden flex items-center justify-center text-slate-500 dark:text-slate-400 font-extrabold text-sm shrink-0">
