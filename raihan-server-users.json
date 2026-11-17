@@ -1,1 +1,33 @@
-[]
+[
+  {
+    "id": "user-1794924314918-fd00a4",
+    "email": "hafismohammed73@gmail.com",
+    "passwordHash": "bdc429166b4c0d15e96adbb0973e00254e5f13ae3fb26a60d25f636087b7f9b1",
+    "role": "Patient",
+    "name": "Hafis Mohammed K",
+    "phone": "9037232939",
+    "dob": "2003-06-13",
+    "gender": "Male",
+    "verified": true,
+    "createdAt": "2026-11-17T14:05:14.918Z"
+  },
+  {
+    "id": "dentist-1794924705904-8f7670",
+    "email": "doctor@clinic.com",
+    "passwordHash": "8339869e24ebd7732100e4058cabb4ff98c32e7bcfce39c3ad87150b8a193028",
+    "role": "Dentist",
+    "name": "Dr. Raihan",
+    "phone": "",
+    "qualification": "BDS, MDS",
+    "licenseNumber": "DDC-12345",
+    "specialty": "General Dentistry",
+    "subSpecialty": "",
+    "hospitalAffiliation": "Raihan Dental Clinic",
+    "consultationFee": 50,
+    "workingHours": "09:00 AM - 05:00 PM, Mon-Sat",
+    "experience": 5,
+    "bio": "Licensed Dental Surgeon committed to patient-centered oral healthcare.",
+    "verified": true,
+    "createdAt": "2026-11-17T14:11:45.905Z"
+  }
+]

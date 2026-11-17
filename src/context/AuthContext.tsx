@@ -296,6 +296,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Purge any legacy demo or test data before restoring session
     purgeLegacyTestData();
 
+    // Sync provisioned dentists from backend
+    fetch('/api/dentist/list')
+      .then(r => r.json())
+      .then(data => {
+        if (data.dentists && Array.isArray(data.dentists)) {
+          const current = getRegisteredUsers();
+          let changed = false;
+          for (const d of data.dentists) {
+            const idx = current.findIndex(u => u.email.toLowerCase() === d.email.toLowerCase());
+            if (idx === -1) {
+              current.push(d);
+              changed = true;
+            } else {
+              current[idx] = { ...current[idx], ...d };
+              changed = true;
+            }
+          }
+          if (changed) {
+            localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(current));
+            window.dispatchEvent(new Event('raihan_users_updated'));
+          }
+        }
+      })
+      .catch(() => {});
+
     // 1. Check for persisted session
     const savedUserJson = localStorage.getItem('raihan_active_user');
     const savedProfileJson = localStorage.getItem('raihan_active_profile');
@@ -482,6 +507,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.success && data.user) {
             const role = data.role || data.user.role || 'Patient';
             const storedProf = getStoredProfile(trimmedEmail, role);
+            if (data.user.name) storedProf.name = data.user.name;
+            if (data.user.phone) storedProf.phone = data.user.phone;
+            if (data.user.specialty) storedProf.specialty = data.user.specialty;
+            if (data.user.qualification) storedProf.education = data.user.qualification;
+            if (data.user.licenseNumber) storedProf.licenseNumber = data.user.licenseNumber;
+
             const authSessionUser = {
               uid: data.user.id,
               email: data.user.email,
@@ -489,8 +520,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               token: data.token
             };
 
+            localStorage.setItem(`raihan_profile_${trimmedEmail}`, JSON.stringify(storedProf));
             localStorage.setItem('raihan_active_user', JSON.stringify(authSessionUser));
             localStorage.setItem('raihan_active_profile', JSON.stringify(storedProf));
+
+            // Sync user to registered users list
+            const currentUsers = getRegisteredUsers();
+            if (!currentUsers.some(u => u.email.toLowerCase() === trimmedEmail)) {
+              currentUsers.push({
+                id: data.user.id,
+                email: data.user.email,
+                name: data.user.name,
+                role: role,
+                passwordHash: '',
+                phone: data.user.phone,
+                qualification: data.user.qualification,
+                licenseNumber: data.user.licenseNumber,
+                specialty: data.user.specialty,
+                createdAt: new Date().toISOString()
+              });
+              localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(currentUsers));
+            }
 
             setUser(authSessionUser);
             setProfile(storedProf);
