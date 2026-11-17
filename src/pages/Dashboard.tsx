@@ -341,7 +341,7 @@ export default function Dashboard() {
         <div className="space-y-6">
           
           {/* Next Confirmed Dental Appointment Banner */}
-          {nextConfirmedAppointment ? (
+          {nextConfirmedAppointment && (
             <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
                 <div className="w-11 h-11 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-800/60">
@@ -365,24 +365,6 @@ export default function Dashboard() {
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition-colors shadow-xs shrink-0 self-start md:self-auto"
               >
                 View Appointment
-              </Link>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400">
-                  <CalendarPlus className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Need a Dental Examination?</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Book an on-site consultation for tooth pain, cleaning, or a dental checkup.</p>
-                </div>
-              </div>
-              <Link
-                to="/appointments"
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition-colors shadow-xs shrink-0 self-start sm:self-auto"
-              >
-                Book Appointment
               </Link>
             </div>
           )}
