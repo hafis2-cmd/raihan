@@ -118,7 +118,7 @@ export default function Dashboard() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
-            Welcome back, {profile?.name || (profile?.email || 'User').split('@')[0]}!
+            Welcome back, {profile?.name || (isDentist ? 'Dentist' : 'Patient')}!
           </h2>
           
           <p className="text-emerald-50/90 leading-relaxed text-sm md:text-base font-medium">

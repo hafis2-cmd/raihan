@@ -107,7 +107,7 @@ export default function Patients() {
             const emailLower = stored.email.toLowerCase();
             const existing: PatientRecord = patientMap.get(emailLower) || {
               email: stored.email,
-              name: stored.name || stored.email.split('@')[0],
+              name: stored.name || 'Patient',
               totalVisits: 0
             };
             patientMap.set(emailLower, {
@@ -135,7 +135,7 @@ export default function Patients() {
         const emailLower = app.patient_email.toLowerCase();
         const p = patientMap.get(emailLower) || {
           email: app.patient_email,
-          name: app.patient_name || app.patient_email.split('@')[0],
+          name: app.patient_name || 'Patient',
           phone: app.patient_phone,
           age: app.patient_age,
           gender: app.patient_gender,

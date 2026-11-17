@@ -196,7 +196,7 @@ export default function Appointments() {
     const dynamicDoctors = registeredDentists.map(d => ({
       id: d.id,
       email: d.email,
-      name: d.name || d.email.split('@')[0],
+      name: d.name || 'Dentist',
       specialty: d.specialty || 'General Dentistry',
       subSpecialty: d.subSpecialty || 'Clinical Dental Practice',
       rating: 5.0,
@@ -253,7 +253,7 @@ export default function Appointments() {
     try {
       await requestAppointment({
         patientEmail: profile.email,
-        patientName: profile.name || (profile.email ? profile.email.split('@')[0] : 'Patient'),
+        patientName: profile.name || 'Patient',
         patientPhone: profile.phone,
         patientAge: profile.age,
         patientGender: profile.gender,

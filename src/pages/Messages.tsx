@@ -174,7 +174,7 @@ export default function Messages() {
       const convId = [profile!.email, targetUser.email].sort().join('_');
       const participantsData = {
         [profile!.email.replace(/\./g, '_')]: { name: profile!.name || 'Me', role: profile!.role || 'User' },
-        [targetUser.email.replace(/\./g, '_')]: { name: targetUser.name || targetUser.email.split('@')[0], role: targetUser.role || 'User' }
+        [targetUser.email.replace(/\./g, '_')]: { name: targetUser.name || 'User', role: targetUser.role || 'User' }
       };
 
       try {
@@ -327,7 +327,7 @@ export default function Messages() {
       await addDoc(collection(db, 'conversations', selectedChat.id, 'messages'), {
         text: textPayload,
         senderEmail: profile.email,
-        senderName: profile.name || profile.email.split('@')[0],
+        senderName: profile.name || (profile.role === 'Doctor' || profile.role === 'Dentist' ? 'Dentist' : 'Patient'),
         timestamp: new Date(),
         readBy: { [profile.email.replace(/\./g, '_')]: new Date().toISOString() }
       });
@@ -705,10 +705,10 @@ export default function Messages() {
                         className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl transition-all text-left group"
                       >
                         <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black text-sm group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-all">
-                          {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                          {(user.name || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-800">{user.name || user.email.split('@')[0]}</p>
+                          <p className="text-sm font-bold text-slate-800">{user.name || 'User'}</p>
                           <p className="text-[10px] text-slate-500 font-medium">{user.email}</p>
                         </div>
                       </button>

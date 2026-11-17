@@ -349,7 +349,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* User Account Info */}
             <div className="text-right hidden sm:block">
               <div className="flex items-center gap-2 justify-end">
-                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{(profile?.email || 'User').split('@')[0]}</p>
+                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                  {profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'Dentist' : 'Patient')}
+                </p>
                 {profile?.subscribed && profile?.role !== 'Admin' && (
                   <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[8px] font-black rounded uppercase tracking-tighter">
                     PRO
@@ -367,7 +369,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             
             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-850 border-2 border-white dark:border-slate-850 shadow-xs overflow-hidden flex items-center justify-center text-slate-500 dark:text-slate-400 font-extrabold text-sm shrink-0">
-              {(profile?.name || profile?.email || 'U').charAt(0).toUpperCase()}
+              {(profile?.name || (profile?.role === 'Doctor' || profile?.role === 'Dentist' ? 'D' : 'P')).charAt(0).toUpperCase()}
             </div>
           </div>
         </header>

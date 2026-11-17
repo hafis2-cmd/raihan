@@ -511,6 +511,101 @@ async function startServer() {
     return res.json({ success: true, count: dentists.length, dentists });
   });
 
+  /**
+   * 7. Current Authenticated User & Profile Endpoint
+   * Returns the actual registered user profile with full name from the server database.
+   */
+  app.get("/api/auth/me", (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const emailHeader = req.headers["x-user-email"];
+      let userEmail = "";
+
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        const decoded = verifyToken(token);
+        if (decoded && decoded.email) {
+          userEmail = decoded.email.toLowerCase().trim();
+        }
+      }
+
+      if (!userEmail && emailHeader) {
+        userEmail = String(emailHeader).toLowerCase().trim();
+      }
+
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized: Missing authentication token or identity." });
+      }
+
+      const users = loadServerUsers();
+      const user = users.find(u => u.email.toLowerCase() === userEmail);
+      if (!user) {
+        return res.status(404).json({ error: "User profile not found in database." });
+      }
+
+      const { passwordHash, ...safeUser } = user;
+      return res.json({ success: true, user: safeUser });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to fetch user profile: " + err.message });
+    }
+  });
+
+  /**
+   * 8. Update Current User Profile
+   * Persists name and profile fields directly to the server database.
+   */
+  app.put("/api/auth/profile", (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const emailHeader = req.headers["x-user-email"];
+      let userEmail = "";
+
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        const decoded = verifyToken(token);
+        if (decoded && decoded.email) {
+          userEmail = decoded.email.toLowerCase().trim();
+        }
+      }
+
+      if (!userEmail && emailHeader) {
+        userEmail = String(emailHeader).toLowerCase().trim();
+      }
+
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const user = users.find(u => u.email.toLowerCase() === userEmail);
+      if (!user) {
+        return res.status(404).json({ error: "User not found." });
+      }
+
+      const { name, phone, dob, gender, address, allergies, dentalHistory, qualification, licenseNumber, consultationFee, hospitalAffiliation, bio } = req.body;
+      if (name && String(name).trim()) user.name = String(name).trim();
+      if (phone !== undefined) user.phone = String(phone).trim();
+      if (dob !== undefined) user.dob = String(dob).trim();
+      if (gender !== undefined) user.gender = String(gender).trim();
+      if (address !== undefined) user.address = String(address).trim();
+      if (allergies !== undefined) user.allergies = String(allergies).trim();
+      if (dentalHistory !== undefined) user.dentalHistory = String(dentalHistory).trim();
+      if (qualification !== undefined) user.qualification = String(qualification).trim();
+      if (licenseNumber !== undefined) user.licenseNumber = String(licenseNumber).trim();
+      if (consultationFee !== undefined) user.consultationFee = consultationFee;
+      if (hospitalAffiliation !== undefined) user.hospitalAffiliation = String(hospitalAffiliation).trim();
+      if (bio !== undefined) user.bio = String(bio).trim();
+      user.updatedAt = new Date().toISOString();
+
+      saveServerUsers(users);
+
+      const { passwordHash, ...safeUser } = user;
+      return res.json({ success: true, message: "Profile updated successfully", user: safeUser });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to update profile: " + err.message });
+    }
+  });
+
   // Enforce JWT verification for all Gemini API endpoints
   app.use("/api/gemini", authMiddleware);
 

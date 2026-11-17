@@ -630,7 +630,7 @@ function AddPrescriptionModal({ onClose }: { onClose: () => void }) {
       // Save to local service and Firestore
       await addDentalPrescription({
         patient_email: formData.patientEmail,
-        patient_name: formData.patientName || (formData.patientEmail ? formData.patientEmail.split('@')[0] : 'Patient'),
+        patient_name: formData.patientName || 'Patient',
         dentist_email: user.email || '',
         dentist_name: user.displayName || profile?.name || 'Attending Dentist',
         prescription_date: new Date().toISOString().split('T')[0],

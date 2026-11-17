@@ -258,7 +258,7 @@ export default function Consultation() {
       await addDoc(collection(db, 'calls', activeCallId, 'messages'), {
         text: newMessage,
         senderEmail: profile.email,
-        senderName: profile.name || profile.email.split('@')[0],
+        senderName: profile.name || 'User',
         timestamp: new Date()
       });
 
@@ -368,7 +368,7 @@ export default function Consultation() {
     if (location.state?.targetEmail) {
       setTargetUser({
         email: location.state.targetEmail,
-        name: location.state.targetName || location.state.targetEmail.split('@')[0]
+        name: location.state.targetName || 'User'
       });
     } else if (profile) {
       // Look for upcoming appointments to suggest a target
@@ -392,7 +392,7 @@ export default function Consultation() {
             } else {
               setTargetUser({
                 email: data.patientEmail,
-                name: data.patientName || data.patientEmail.split('@')[0]
+                name: data.patientName || 'Patient'
               });
             }
           }
@@ -784,7 +784,7 @@ export default function Consultation() {
       // Create new call record in Firestore
       const callDocRef = await addDoc(collection(db, 'calls'), {
         callerEmail: profile.email,
-        callerName: profile.name || profile.email.split('@')[0],
+        callerName: profile.name || 'User',
         receiverEmail: targetUser.email,
         receiverName: targetUser.name,
         status: 'calling',
@@ -1703,7 +1703,7 @@ export default function Consultation() {
                             <button
                               key={doc.id}
                               onClick={() => {
-                                setTargetUser({ email: doc.email, name: doc.name || doc.email.split('@')[0] });
+                                setTargetUser({ email: doc.email, name: doc.name || 'Dentist' });
                                 setSetupMode('caller');
                                 setCallStatus('setup');
                               }}
@@ -1768,7 +1768,7 @@ export default function Consultation() {
                             <button
                               key={pat.id}
                               onClick={() => {
-                                setTargetUser({ email: pat.email, name: pat.name || pat.email.split('@')[0] });
+                                setTargetUser({ email: pat.email, name: pat.name || 'Patient' });
                                 setSetupMode('caller');
                                 setCallStatus('setup');
                               }}
@@ -1781,7 +1781,7 @@ export default function Consultation() {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-bold truncate">{pat.name || pat.email.split('@')[0]}</p>
+                                <p className="text-white text-sm font-bold truncate">{pat.name || 'Patient'}</p>
                                 <p className="text-slate-400 text-[10px] uppercase tracking-wider truncate">Patient</p>
                               </div>
                               <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors" />

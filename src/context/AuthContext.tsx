@@ -263,23 +263,36 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getStoredProfile = (email: string, role: 'Doctor' | 'Dentist' | 'Patient' | 'Admin'): UserProfile => {
-  const emailKey = `raihan_profile_${email.toLowerCase().trim()}`;
+  const trimmed = email.toLowerCase().trim();
+  const emailKey = `raihan_profile_${trimmed}`;
   const stored = localStorage.getItem(emailKey);
+
+  // Look up registered user to always resolve registered full name as primary source
+  const registered = getRegisteredUsers();
+  const existing = registered.find(u => u.email.toLowerCase() === trimmed);
+  const registeredName = existing?.name?.trim() || '';
+
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      return { ...parsed, email, role: (role === 'Doctor' ? 'Dentist' : role) as any };
+      const finalName = (parsed.name && parsed.name.trim()) ? parsed.name.trim() : registeredName;
+      return { 
+        ...parsed, 
+        email: trimmed, 
+        role: (role === 'Doctor' ? 'Dentist' : role) as any,
+        name: finalName
+      };
     } catch (e) {
       console.warn("Failed to parse stored profile for", email, e);
     }
   }
 
-  // Production blank profile (no dummy names or fake credentials)
+  // Production blank profile with registered database name
   return {
-    email,
+    email: trimmed,
     role: (role === 'Doctor' ? 'Dentist' : role) as any,
-    name: '',
-    subscribed: email === ADMIN_EMAIL,
+    name: registeredName,
+    subscribed: trimmed === ADMIN_EMAIL,
     isOnline: true,
     createdAt: new Date(),
     updatedAt: new Date()
@@ -327,19 +340,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (savedUserJson && savedProfileJson) {
       try {
         const parsedUser = JSON.parse(savedUserJson);
-        const parsedProfile = JSON.parse(savedProfileJson);
+        let parsedProfile = JSON.parse(savedProfileJson);
+        const userEmail = (parsedUser.email || parsedProfile.email || '').toLowerCase().trim();
         
         // If an updated profile exists specifically under this email, prioritize it
-        if (parsedUser.email) {
-          const emailKey = `raihan_profile_${parsedUser.email.toLowerCase().trim()}`;
+        if (userEmail) {
+          const emailKey = `raihan_profile_${userEmail}`;
           const emailSaved = localStorage.getItem(emailKey);
           if (emailSaved) {
-            const parsedEmailProfile = JSON.parse(emailSaved);
-            setUser(parsedUser);
-            setProfile(parsedEmailProfile);
-            setLoading(false);
-            return;
+            parsedProfile = JSON.parse(emailSaved);
           }
+
+          // Ensure profile.name is properly retrieved from registered database if missing
+          if (!parsedProfile.name || !parsedProfile.name.trim()) {
+            const registered = getRegisteredUsers();
+            const existing = registered.find(u => u.email.toLowerCase() === userEmail);
+            if (existing?.name?.trim()) {
+              parsedProfile.name = existing.name.trim();
+              localStorage.setItem(emailKey, JSON.stringify(parsedProfile));
+              localStorage.setItem('raihan_active_profile', JSON.stringify(parsedProfile));
+            }
+          }
+
+          // Fetch fresh profile from backend API to ensure real database name is synchronized
+          fetch('/api/auth/me', {
+            headers: {
+              ...(parsedUser.token ? { 'Authorization': `Bearer ${parsedUser.token}` } : {}),
+              'x-user-email': userEmail
+            }
+          })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.user && data.user.name) {
+                const updatedProf = {
+                  ...parsedProfile,
+                  ...data.user,
+                  name: data.user.name,
+                  role: parsedProfile.role || data.user.role
+                };
+                parsedUser.displayName = data.user.name;
+                localStorage.setItem(emailKey, JSON.stringify(updatedProf));
+                localStorage.setItem('raihan_active_profile', JSON.stringify(updatedProf));
+                localStorage.setItem('raihan_active_user', JSON.stringify(parsedUser));
+                setProfile(updatedProf);
+                setUser(parsedUser);
+              }
+            })
+            .catch(() => {});
+        }
+
+        if (parsedProfile.name) {
+          parsedUser.displayName = parsedProfile.name;
         }
 
         setUser(parsedUser);
@@ -431,7 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: currentUser.email || '',
           role: finalRole,
           subscribed: currentUser.email === ADMIN_EMAIL,
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || defaultProfile.name,
+          name: currentUser.displayName || defaultProfile.name || (finalRole === 'Admin' ? 'Administrator' : 'Patient'),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
@@ -526,7 +577,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Sync user to registered users list
             const currentUsers = getRegisteredUsers();
-            if (!currentUsers.some(u => u.email.toLowerCase() === trimmedEmail)) {
+            const uIdx = currentUsers.findIndex(u => u.email.toLowerCase() === trimmedEmail);
+            if (uIdx === -1) {
               currentUsers.push({
                 id: data.user.id,
                 email: data.user.email,
@@ -539,8 +591,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 specialty: data.user.specialty,
                 createdAt: new Date().toISOString()
               });
-              localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(currentUsers));
+            } else {
+              if (data.user.name) currentUsers[uIdx].name = data.user.name;
+              if (data.user.phone) currentUsers[uIdx].phone = data.user.phone;
+              if (role) currentUsers[uIdx].role = role;
             }
+            localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(currentUsers));
 
             setUser(authSessionUser);
             setProfile(storedProf);
@@ -586,12 +642,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const storedProf = getStoredProfile(trimmedEmail, existing.role);
+      if (existing.name) {
+        storedProf.name = existing.name;
+      }
       const authSessionUser = {
         uid: existing.id,
         email: existing.email,
         displayName: existing.name
       };
 
+      localStorage.setItem(`raihan_profile_${trimmedEmail}`, JSON.stringify(storedProf));
       localStorage.setItem('raihan_active_user', JSON.stringify(authSessionUser));
       localStorage.setItem('raihan_active_profile', JSON.stringify(storedProf));
 
@@ -876,7 +936,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(userDocRef, {
           email: auth.currentUser.email || '',
           role: finalRole,
-          name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || '',
+          name: auth.currentUser.displayName || '',
           subscribed: auth.currentUser.email === ADMIN_EMAIL,
           updatedAt: serverTimestamp()
         }, { merge: true });
@@ -924,6 +984,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updatedUser = { ...user, displayName: updatedData.name };
       setUser(updatedUser);
       localStorage.setItem('raihan_active_user', JSON.stringify(updatedUser));
+    }
+
+    // Update registered user store if name or details changed
+    if (email) {
+      const regUsers = getRegisteredUsers();
+      const uIdx = regUsers.findIndex(u => u.email.toLowerCase() === email.toLowerCase().trim());
+      if (uIdx !== -1) {
+        if (updatedData.name) regUsers[uIdx].name = updatedData.name;
+        if (updatedData.phone) regUsers[uIdx].phone = updatedData.phone;
+        localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(regUsers));
+        window.dispatchEvent(new Event('raihan_users_updated'));
+      }
+
+      // Sync to backend database
+      try {
+        await fetch('/api/auth/profile', {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-user-email': email
+          },
+          body: JSON.stringify(updatedData)
+        });
+      } catch (e) {
+        console.warn("Backend profile sync notice:", e);
+      }
     }
 
     // Write to Firestore if configured

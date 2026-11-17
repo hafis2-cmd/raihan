@@ -52,7 +52,7 @@ export default function Diagnosis() {
   const preselectedName = location.state?.patientName || location.state?.targetPatientName || location.state?.targetName;
 
   const [targetPatient, setTargetPatient] = useState<{ email: string; name: string } | null>(
-    preselectedEmail ? { email: preselectedEmail, name: preselectedName || preselectedEmail.split('@')[0] } : null
+    preselectedEmail ? { email: preselectedEmail, name: preselectedName || 'Patient' } : null
   );
 
   const [disease, setDisease] = useState('General');
@@ -113,7 +113,7 @@ export default function Diagnosis() {
       }
 
       const patientEmail = targetPatient ? targetPatient.email : (profile?.email || 'anonymous@telemed.ai');
-      const patientName = targetPatient ? targetPatient.name : (profile?.name || (profile?.email ? profile.email.split('@')[0] : 'Patient'));
+      const patientName = targetPatient ? targetPatient.name : (profile?.name || 'Patient');
 
       const shareDocData = {
         patientEmail,
@@ -1561,7 +1561,7 @@ export default function Diagnosis() {
                           <option value="">Do not associate (Link share only)</option>
                           {doctorsList.map((doc: any) => (
                             <option key={doc.id} value={doc.email}>
-                              Dr. {doc.name || doc.email.split('@')[0]} ({doc.specialty || 'General Practitioner'})
+                              Dr. {doc.name || 'Dentist'} ({doc.specialty || 'General Practitioner'})
                             </option>
                           ))}
                         </select>
