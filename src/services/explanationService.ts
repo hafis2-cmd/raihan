@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { auth } from "../firebase";
 import API_BASE_URL from "../config";
 
 export interface FeatureExplanation {
@@ -21,8 +21,7 @@ export async function getProfileExplanation(profile: {
   bloodGroup: string;
 }): Promise<ProfileExplanation> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await auth.currentUser?.getIdToken();
     const response = await fetch(`${API_BASE_URL}/api/gemini/profile-explanation`, {
       method: "POST",
       headers: {

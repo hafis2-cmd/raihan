@@ -17,7 +17,8 @@ import {
   FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
@@ -37,34 +38,39 @@ export default function CallHistory() {
   useEffect(() => {
     if (!profile?.email) return;
 
-    const fetchCalls = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('call_history')
-          .select('*')
-          .contains('participants', [profile.email])
-          .order('start_time', { ascending: false })
-          .limit(50);
-        
-        if (error) throw error;
-        setCalls((data || []).map((d: any) => ({ id: d.id, callerEmail: d.caller_email, callerName: d.caller_name, receiverEmail: d.receiver_email, receiverName: d.receiver_name, startTime: d.start_time, duration: d.duration, status: d.status, participants: d.participants, ...d })));
-      } catch (err) {
-        console.error('Error fetching call history:', err);
-      } finally {
-        setLoading(false);
-      }
+    const q = query(
+      collection(db, 'call_history'),
+      where('participants', 'array-contains', profile.email)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const historyList: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const h = docSnap.data();
+        historyList.push({
+          id: docSnap.id,
+          callerEmail: h.callerEmail,
+          callerName: h.callerName,
+          receiverEmail: h.receiverEmail,
+          receiverName: h.receiverName,
+          startTime: h.startTime?.toDate ? h.startTime.toDate().toISOString() : h.startTime,
+          duration: h.duration,
+          status: h.status,
+          participants: h.participants,
+          ...h
+        });
+      });
+      historyList.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      setCalls(historyList);
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching call history:', err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
-
-    fetchCalls();
-
-    const channel = supabase
-      .channel('call-history-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_history' }, () => {
-        fetchCalls();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [profile?.email]);
 
   const formatDuration = (seconds: number) => {

@@ -23,7 +23,20 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfirmation } from '../context/ConfirmationContext';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  onSnapshot, 
+  getDocs, 
+  doc, 
+  updateDoc, 
+  addDoc, 
+  deleteDoc 
+} from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -47,35 +60,26 @@ export default function Dashboard() {
     const newStatus = !profile.isOnline;
     
     try {
-      // 1. Update isOnline status in public.users
-      const { error: userErr } = await supabase
-        .from('users')
-        .update({
-          is_online: newStatus,
-          last_seen: new Date().toISOString()
-        })
-        .eq('id', user.id);
+      const userRef = doc(db, 'users', user.uid || user.id);
+      await updateDoc(userRef, {
+        isOnline: newStatus,
+        lastSeen: new Date().toISOString()
+      });
 
-      if (userErr) throw userErr;
-
-      // Update local profile directly to keep UI responsive
       profile.isOnline = newStatus;
 
-      // 2. Real-time slot management:
       const todayStr = new Date().toISOString().split('T')[0];
+      const slotsRef = collection(db, 'slots');
       
       if (newStatus) {
-        // Find existing slots for today
-        const { data: slotsSnap, error: slotsErr } = await supabase
-          .from('slots')
-          .select('*')
-          .eq('doctor_email', profile.email)
-          .eq('slot_date', todayStr);
-
-        if (slotsErr) throw slotsErr;
+        const qSlots = query(
+          slotsRef,
+          where('doctorEmail', '==', profile.email),
+          where('date', '==', todayStr)
+        );
+        const slotsSnapshot = await getDocs(qSlots);
         
-        if (!slotsSnap || slotsSnap.length === 0) {
-          // If no slots exist for today, automatically register 3 consult hours from next hour onwards!
+        if (slotsSnapshot.empty) {
           const now = new Date();
           const currentHour = now.getHours();
           
@@ -85,43 +89,33 @@ export default function Dashboard() {
             const h12 = nextHour % 12 || 12;
             const formattedTime = `${h12.toString().padStart(2, '0')}:00 ${ampm}`;
             
-            await supabase
-              .from('slots')
-              .insert({
-                doctor_email: profile.email,
-                doctor_name: profile.name || profile.email.split('@')[0],
-                slot_date: todayStr,
-                slot_time: formattedTime,
-                is_available: true
-              });
+            await addDoc(slotsRef, {
+              doctorEmail: profile.email,
+              doctorName: profile.name || profile.email.split('@')[0],
+              date: todayStr,
+              time: formattedTime,
+              isAvailable: true,
+              timestamp: new Date()
+            });
           }
         } else {
-          // Toggle existing today's slots to is_available: true
-          for (const s of slotsSnap) {
-            await supabase
-              .from('slots')
-              .update({ is_available: true })
-              .eq('id', s.id);
+          for (const d of slotsSnapshot.docs) {
+            await updateDoc(doc(db, 'slots', d.id), {
+              isAvailable: true
+            });
           }
         }
       } else {
-        // Toggled OFF: Mark available slots as unavailable or delete unoccupied ones
-        const { data: slotsSnap, error: slotsErr } = await supabase
-          .from('slots')
-          .select('*')
-          .eq('doctor_email', profile.email)
-          .eq('slot_date', todayStr)
-          .eq('is_available', true);
+        const qSlots = query(
+          slotsRef,
+          where('doctorEmail', '==', profile.email),
+          where('date', '==', todayStr),
+          where('isAvailable', '==', true)
+        );
+        const slotsSnapshot = await getDocs(qSlots);
 
-        if (slotsErr) throw slotsErr;
-
-        if (slotsSnap) {
-          for (const s of slotsSnap) {
-            await supabase
-              .from('slots')
-              .delete()
-              .eq('id', s.id);
-          }
+        for (const d of slotsSnapshot.docs) {
+          await deleteDoc(doc(db, 'slots', d.id));
         }
       }
     } catch (error) {
@@ -134,69 +128,75 @@ export default function Dashboard() {
   useEffect(() => {
     if (!profile?.email) return;
 
-    let notifChannel: any;
-    let apptChannel: any;
+    const qNotifs = query(
+      collection(db, 'notifications'),
+      where('recipientEmail', '==', profile.email),
+      orderBy('timestamp', 'desc'),
+      limit(5)
+    );
+    const unsubscribeNotifs = onSnapshot(qNotifs, (snapshot) => {
+      const notifs: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        notifs.push({
+          id: docSnap.id,
+          recipient_email: d.recipientEmail,
+          message: d.message,
+          notification_type: d.type,
+          created_at: d.timestamp ? d.timestamp.toDate().toISOString() : new Date().toISOString()
+        });
+      });
+      setNotifications(notifs);
+    }, (err) => {
+      console.error("Error listening to notifications:", err);
+    });
 
-    const fetchNotifications = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('recipient_email', profile.email)
-          .order('created_at', { ascending: false })
-          .limit(5);
+    let unsubscribeApptsOrDiagnoses: () => void = () => {};
 
-        if (error) throw error;
-        setNotifications(data || []);
-      } catch (err) {
-        console.error("Error fetching notifications:", err);
-      }
-    };
-
-    const fetchRecentAppointments = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('appointments')
-          .select('*')
-          .eq('doctor_email', profile.email)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (error) throw error;
-        // Map slot dates and times into compatible structures
-        const mapped = (data || []).map(a => ({
-          id: a.id,
-          patientEmail: a.patient_email,
-          patientName: a.patient_name,
-          date: a.appointment_date,
-          time: a.appointment_time,
-          status: a.status
-        }));
-        setRecentAppointments(mapped);
+    if (profile.role === 'Doctor') {
+      const qAppts = query(
+        collection(db, 'appointments'),
+        where('doctorEmail', '==', profile.email),
+        orderBy('timestamp', 'desc'),
+        limit(5)
+      );
+      unsubscribeApptsOrDiagnoses = onSnapshot(qAppts, (snapshot) => {
+        const appts: any[] = [];
+        snapshot.forEach((docSnap) => {
+          const a = docSnap.data();
+          appts.push({
+            id: docSnap.id,
+            patientEmail: a.patientEmail || a.patient_email,
+            patientName: a.patientName || a.patient_name,
+            date: a.date || a.appointment_date,
+            time: a.time || a.appointment_time,
+            status: a.status
+          });
+        });
+        setRecentAppointments(appts);
         setIsLoading(false);
-      } catch (err) {
-        console.error("Error fetching doctor appointments:", err);
+      }, (err) => {
+        console.error("Error listening to appointments:", err);
         setIsLoading(false);
-      }
-    };
+      });
+    } else {
+      const qDiagnoses = query(
+        collection(db, 'diagnoses'),
+        where('patientEmail', '==', profile.email),
+        orderBy('timestamp', 'desc'),
+        limit(20)
+      );
+      unsubscribeApptsOrDiagnoses = onSnapshot(qDiagnoses, (snapshot) => {
+        const data: any[] = [];
+        snapshot.forEach((docSnap) => {
+          data.push({ id: docSnap.id, ...docSnap.data() });
+        });
 
-    const fetchRecentDiagnoses = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('diagnoses')
-          .select('*')
-          .eq('patient_email', profile.email)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (error) throw error;
-
-        // Deduplicate to ensure only one unique diagnosis entry per condition per patient is shown (keeping the latest)
         const uniqueData: any[] = [];
         const seenKeys = new Set<string>();
         
-        for (const item of (data || [])) {
-          const patientKey = (item.patient_email || profile.email || '').toLowerCase().trim();
+        for (const item of data) {
+          const patientKey = (item.patientEmail || profile.email || '').toLowerCase().trim();
           const conditionKey = (item.condition || '').toLowerCase().trim();
           const compositeKey = `${patientKey}|${conditionKey}`;
           
@@ -207,52 +207,21 @@ export default function Dashboard() {
               condition: item.condition,
               risk: item.risk,
               explanation: item.explanation,
-              created_at: item.created_at
+              created_at: item.timestamp ? item.timestamp.toDate().toISOString() : new Date().toISOString()
             });
           }
         }
-        
         setRecentDiagnoses(uniqueData.slice(0, 5));
         setIsLoading(false);
-      } catch (err) {
-        console.error("Error fetching patient diagnoses:", err);
+      }, (err) => {
+        console.error("Error listening to diagnoses:", err);
         setIsLoading(false);
-      }
-    };
-
-    // Initial loads
-    fetchNotifications();
-
-    if (profile.role === 'Doctor') {
-      fetchRecentAppointments();
-      
-      apptChannel = supabase
-        .channel('doctor-appts')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `doctor_email=eq.${profile.email}` }, () => {
-          fetchRecentAppointments();
-        })
-        .subscribe();
-    } else {
-      fetchRecentDiagnoses();
-
-      apptChannel = supabase
-        .channel('patient-diagnoses')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'diagnoses', filter: `patient_email=eq.${profile.email}` }, () => {
-          fetchRecentDiagnoses();
-        })
-        .subscribe();
+      });
     }
 
-    notifChannel = supabase
-      .channel('recipient-notifs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `recipient_email=eq.${profile.email}` }, () => {
-        fetchNotifications();
-      })
-      .subscribe();
-
     return () => {
-      notifChannel?.unsubscribe();
-      apptChannel?.unsubscribe();
+      unsubscribeNotifs();
+      unsubscribeApptsOrDiagnoses();
     };
   }, [profile?.email, profile?.role]);
 
@@ -267,12 +236,7 @@ export default function Dashboard() {
     if (!isConfirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('diagnoses')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await deleteDoc(doc(db, 'diagnoses', id));
       setRecentDiagnoses(prev => prev.filter(d => d.id !== id));
     } catch (error) {
       console.error("Error deleting diagnosis:", error);

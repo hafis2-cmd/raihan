@@ -21,7 +21,9 @@ import {
   CheckCircle2,
   Video
 } from 'lucide-react';
-import { supabase } from '../supabase';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -58,32 +60,36 @@ export default function Doctors() {
   const [filter, setFilter] = useState('All');
 
   useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('role', 'Doctor');
-        
-        if (error) throw error;
-        setDoctors((data || []).map((d: any) => ({ id: d.id, ...d })));
-      } catch (err) {
-        console.error("Error fetching doctors:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const q = query(collection(db, 'users'), where('role', '==', 'Doctor'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: DoctorProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          email: d.email,
+          role: d.role,
+          subscribed: d.subscribed,
+          name: d.name,
+          specialty: d.specialty,
+          bio: d.bio,
+          location: d.location,
+          experience: d.experience,
+          photoURL: d.photoURL || d.image,
+          image: d.image || d.photoURL,
+          isOnline: d.isOnline || false,
+          lastSeen: d.lastSeen,
+          ...d
+        } as DoctorProfile);
+      });
+      setDoctors(list);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error fetching doctors:", err);
+      setLoading(false);
+    });
 
-    fetchDoctors();
-
-    const channel = supabase
-      .channel('doctors-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: 'role=eq.Doctor' }, () => {
-        fetchDoctors();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    return () => { unsubscribe(); };
   }, []);
 
   const filteredDoctors = doctors.filter(doc => {

@@ -38,8 +38,9 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { collection, query, where, addDoc, getDocs } from 'firebase/firestore';
 import { DISEASE_CATEGORIES } from '../constants';
 
 export default function Diagnosis() {
@@ -78,13 +79,13 @@ export default function Diagnosis() {
   useEffect(() => {
     async function loadDoctorsList() {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('role', 'Doctor');
-        
-        if (error) throw error;
-        setDoctorsList(data || []);
+        const q = query(collection(db, 'users'), where('role', '==', 'Doctor'));
+        const snapshot = await getDocs(q);
+        const docsList: any[] = [];
+        snapshot.forEach((docSnap) => {
+          docsList.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        setDoctorsList(docsList);
       } catch (err) {
         console.error("Error loading doctors:", err);
       }
@@ -115,45 +116,37 @@ export default function Diagnosis() {
       const patientName = targetPatient ? targetPatient.name : (profile?.name || (profile?.email ? profile.email.split('@')[0] : 'Patient'));
 
       const shareDocData = {
-        patient_email: patientEmail,
-        patient_name: patientName,
-        doctor_email: selectedPhysicianEmail || null,
+        patientEmail,
+        patientName,
+        doctorEmail: selectedPhysicianEmail || null,
         condition: result.condition || "Potential Condition Detected",
-        risk: result.confidence_score || 85,
+        risk: Number(result.confidence_score) || 85,
         explanation: result.explanation || "No explanation provided.",
         recommendations: result.recommendations || [],
-        expires_at: expiresAt.toISOString()
+        expiresAt: expiresAt,
+        createdAt: now
       };
 
-      // Add to shared_diagnoses table
-      const { data: shareRow, error: shareErr } = await supabase
-        .from('shared_diagnoses')
-        .insert(shareDocData)
-        .select('id')
-        .single();
+      const docRef = await addDoc(collection(db, 'shared_diagnoses'), shareDocData);
 
-      if (shareErr || !shareRow) throw shareErr || new Error("Failed to register share link.");
-
-      // Also push to standard diagnoses collection so the doctor can view it in their history directly
       try {
-        await supabase
-          .from('diagnoses')
-          .insert({
-            patient_email: patientEmail,
-            condition: result.condition || "Potential Condition Detected",
-            risk: result.confidence_score || 85,
-            explanation: result.explanation || "No explanation provided.",
-            feature_importance: result.feature_importance || []
-          });
+        await addDoc(collection(db, 'diagnoses'), {
+          patientEmail,
+          condition: result.condition || "Potential Condition Detected",
+          risk: Number(result.confidence_score) || 85,
+          explanation: result.explanation || "No explanation provided.",
+          feature_importance: result.feature_importance || [],
+          timestamp: new Date()
+        });
       } catch (diagErr) {
         console.warn("Could not write duplicate to diagnoses collection:", diagErr);
       }
       
-      const shareUrl = `${window.location.origin}/shared-diagnosis/${shareRow.id}`;
+      const shareUrl = `${window.location.origin}/shared-diagnosis/${docRef.id}`;
       setGeneratedShareLink(shareUrl);
     } catch (err: any) {
-      console.error("Error storing shared diagnosis:", err);
-      setShareError("Failed to register access link. Please try again.");
+      console.error(err);
+      setShareError("Failed to register share link. Please try again.");
     } finally {
       setIsSharing(false);
     }
@@ -594,15 +587,14 @@ export default function Diagnosis() {
 
       if (profile || targetPatient) {
         try {
-          await supabase
-            .from('diagnoses')
-            .insert({
-              patient_email: targetPatient ? targetPatient.email : (profile?.email || 'anonymous@telemed.ai'),
-              condition: data.condition,
-              risk: data.confidence_score,
-              explanation: data.explanation,
-              feature_importance: data.feature_importance || []
-            });
+          await addDoc(collection(db, 'diagnoses'), {
+            patientEmail: targetPatient ? targetPatient.email : (profile?.email || 'anonymous@telemed.ai'),
+            condition: data.condition,
+            risk: Number(data.confidence_score) || 85,
+            explanation: data.explanation,
+            feature_importance: data.feature_importance || [],
+            timestamp: new Date()
+          });
         } catch (err) {
           console.error("Error logging diagnosis:", err);
         }
@@ -646,18 +638,16 @@ export default function Diagnosis() {
       const data = await analyzeSymptoms(symptoms, base64 || undefined, disease, testValuesStr, []);
       setResult(data);
 
-      // Save to diagnoses in Supabase
       if (profile || targetPatient) {
         try {
-          await supabase
-            .from('diagnoses')
-            .insert({
-              patient_email: targetPatient ? targetPatient.email : (profile?.email || 'anonymous@telemed.ai'),
-              condition: data.condition,
-              risk: data.confidence_score,
-              explanation: data.explanation,
-              feature_importance: data.feature_importance || []
-            });
+          await addDoc(collection(db, 'diagnoses'), {
+            patientEmail: targetPatient ? targetPatient.email : (profile?.email || 'anonymous@telemed.ai'),
+            condition: data.condition,
+            risk: Number(data.confidence_score) || 85,
+            explanation: data.explanation,
+            feature_importance: data.feature_importance || [],
+            timestamp: new Date()
+          });
         } catch (err) {
           console.error("Error saving diagnosis:", err);
         }

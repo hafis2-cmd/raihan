@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { auth } from "../firebase";
 import API_BASE_URL from "../config";
 
 const AI_BOT_EMAIL = "ai-bot@healthline.com";
@@ -12,8 +12,7 @@ export const aiBotParticipant = {
 
 export async function getAiResponse(userMessage: string, history: { role: 'user' | 'model', content: string }[]) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await auth.currentUser?.getIdToken();
     const response = await fetch(`${API_BASE_URL}/api/gemini/chat`, {
       method: "POST",
       headers: {

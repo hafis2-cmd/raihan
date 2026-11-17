@@ -20,7 +20,8 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { collection, query, where, addDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -51,45 +52,39 @@ export default function Payments() {
   useEffect(() => {
     if (!user || !profile) return;
 
-    const fetchPayments = async () => {
-      try {
-        let query = supabase.from('payments').select('*');
-        
-        if (profile.role !== 'Admin') {
-          query = query.eq('patient_email', user.email);
-        }
-        
-        const { data, error } = await query.order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        setPayments((data || []).map((d: any) => ({
-          id: d.id,
-          patientEmail: d.patient_email,
-          patientName: d.patient_name,
+    let q = query(collection(db, 'payments'));
+
+    if (profile.role !== 'Admin') {
+      q = query(q, where('patientEmail', '==', user.email));
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          patientEmail: d.patientEmail,
+          patientName: d.patientName,
           amount: d.amount,
           currency: d.currency,
           status: d.status,
           description: d.description,
           method: d.method,
-          timestamp: d.created_at
-        })));
-      } catch (err) {
-        console.error('Error fetching payments:', err);
-      } finally {
-        setLoading(false);
-      }
+          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp
+        });
+      });
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setPayments(list);
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching payments:', err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
-
-    fetchPayments();
-
-    const channel = supabase
-      .channel('payments-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        fetchPayments();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [user, profile]);
 
   const filteredPayments = payments.filter(p => {
@@ -300,14 +295,13 @@ function PaymentModal({ payment, onClose }: { payment: Payment, onClose: () => v
 
   const handlePayment = async () => {
     setIsProcessing(true);
-    // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     try {
-      await supabase
-        .from('payments')
-        .update({ status: 'completed', method: 'Visa •••• 4242' })
-        .eq('id', payment.id);
+      await updateDoc(doc(db, 'payments', payment.id), {
+        status: 'completed',
+        method: 'Visa •••• 4242'
+      });
       setSuccess(true);
       setTimeout(() => onClose(), 1500);
     } catch (error) {
@@ -414,14 +408,15 @@ function CreatePaymentModal({ onClose }: { onClose: () => void }) {
 
     setIsSaving(true);
     try {
-      await supabase.from('payments').insert({
-        patient_email: user.email,
-        patient_name: profile.name || user.displayName || 'Patient',
+      await addDoc(collection(db, 'payments'), {
+        patientEmail: user.email,
+        patientName: profile.name || user.displayName || 'Patient',
         amount: parseFloat(formData.amount),
         currency: 'USD',
         status: 'completed',
         description: formData.description,
-        method: formData.method
+        method: formData.method,
+        timestamp: new Date()
       });
       setSuccess(true);
       setTimeout(() => onClose(), 1500);

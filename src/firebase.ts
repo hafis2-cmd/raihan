@@ -20,14 +20,21 @@ const resolvedDatabaseId = (() => {
   return undefined;
 })();
 
+const getVal = (envVal: string | undefined, configVal: string | undefined) => {
+  if (envVal && envVal.trim() !== '' && !envVal.includes('your_') && !envVal.includes('your-')) {
+    return envVal.trim();
+  }
+  return configVal || '';
+};
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || configJson.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || configJson.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || configJson.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || configJson.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || configJson.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || configJson.appId,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || configJson.measurementId,
+  apiKey: getVal(import.meta.env.VITE_FIREBASE_API_KEY, configJson.apiKey),
+  authDomain: getVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, configJson.authDomain),
+  projectId: getVal(import.meta.env.VITE_FIREBASE_PROJECT_ID, configJson.projectId),
+  storageBucket: getVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, configJson.storageBucket),
+  messagingSenderId: getVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, configJson.messagingSenderId),
+  appId: getVal(import.meta.env.VITE_FIREBASE_APP_ID, configJson.appId),
+  measurementId: getVal(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, configJson.measurementId),
   firestoreDatabaseId: resolvedDatabaseId,
 };
 

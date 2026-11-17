@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { collection, query, where, addDoc, onSnapshot } from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -70,48 +71,42 @@ export default function Prescriptions() {
   useEffect(() => {
     if (!user || !profile) return;
 
-    const fetchPrescriptions = async () => {
-      try {
-        let query = supabase.from('prescriptions').select('*');
-        
-        if (profile.role === 'Doctor') {
-          query = query.eq('doctor_email', user.email);
-        } else if (profile.role !== 'Admin') {
-          query = query.eq('patient_email', user.email);
-        }
-        
-        const { data, error } = await query.order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        setPrescriptions((data || []).map((d: any) => ({
-          id: d.id,
-          patientEmail: d.patient_email,
-          patientName: d.patient_name,
-          doctorName: d.doctor_name,
-          doctorEmail: d.doctor_email,
+    let q = query(collection(db, 'prescriptions'));
+
+    if (profile.role === 'Doctor') {
+      q = query(q, where('doctorEmail', '==', user.email));
+    } else if (profile.role !== 'Admin') {
+      q = query(q, where('patientEmail', '==', user.email));
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          patientEmail: d.patientEmail,
+          patientName: d.patientName,
+          doctorName: d.doctorName,
+          doctorEmail: d.doctorEmail,
           date: d.date,
           medications: d.medications || [],
           notes: d.notes,
-          prescriptionImage: d.prescription_image,
-          timestamp: d.created_at
-        })));
-      } catch (err) {
-        console.error('Error fetching prescriptions:', err);
-      } finally {
-        setLoading(false);
-      }
+          prescriptionImage: d.prescriptionImage,
+          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp
+        });
+      });
+      list.sort((a, b) => new Date(b.timestamp || b.date).getTime() - new Date(a.timestamp || a.date).getTime());
+      setPrescriptions(list);
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching prescriptions:', err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
-
-    fetchPrescriptions();
-
-    const channel = supabase
-      .channel('prescriptions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
-        fetchPrescriptions();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [user, profile]);
 
   const filteredPrescriptions = prescriptions.filter(p => 
@@ -448,25 +443,22 @@ function AddPrescriptionModal({ onClose }: { onClose: () => void }) {
 
     try {
       const prescriptionData: any = {
-        patient_email: formData.patientEmail,
-        patient_name: formData.patientName,
-        notes: formData.notes,
-        doctor_name: user.displayName || profile?.name || 'Doctor',
-        doctor_email: user.email,
-        date: new Date().toISOString().split('T')[0]
+        patientEmail: formData.patientEmail,
+        patientName: formData.patientName,
+        notes: formData.notes || '',
+        doctorName: user.displayName || profile?.name || 'Doctor',
+        doctorEmail: user.email,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date()
       };
 
       if (mode === 'write') {
         prescriptionData.medications = formData.medications;
       } else {
-        prescriptionData.prescription_image = formData.prescriptionImage;
+        prescriptionData.prescriptionImage = formData.prescriptionImage || '';
       }
 
-      const { error: insertErr } = await supabase
-        .from('prescriptions')
-        .insert(prescriptionData);
-
-      if (insertErr) throw insertErr;
+      await addDoc(collection(db, 'prescriptions'), prescriptionData);
 
       setSuccess(true);
       setTimeout(() => onClose(), 2000);

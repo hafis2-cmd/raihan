@@ -26,7 +26,9 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
+import { db, auth } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { getProfileExplanation, ProfileExplanation } from '../services/explanationService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -91,10 +93,8 @@ export default function Profile() {
     setFormData(prev => ({ ...prev, newsletter: newValue }));
     
     try {
-      await supabase
-        .from('users')
-        .update({ newsletter: newValue })
-        .eq('email', user.email);
+      const userRef = doc(db, 'users', user.uid || user.id);
+      await updateDoc(userRef, { newsletter: newValue });
     } catch (error) {
       console.error('Error updating newsletter status:', error);
       // Revert local state if DB update fails
@@ -112,17 +112,17 @@ export default function Profile() {
         name: formData.name,
         age: formData.age ? parseInt(formData.age) : null,
         gender: formData.gender,
-        blood_group: formData.bloodGroup,
+        bloodGroup: formData.bloodGroup,
         allergies: formData.allergies,
-        medical_history: formData.medicalHistory,
+        medicalHistory: formData.medicalHistory,
         newsletter: formData.newsletter,
         specialty: formData.specialty,
         bio: formData.bio,
         location: formData.location,
         experience: formData.experience ? parseInt(formData.experience) : null,
         image: formData.image,
-        photo_url: formData.image,
-        updated_at: new Date().toISOString()
+        photoURL: formData.image,
+        updatedAt: new Date().toISOString()
       };
       
       // Only include role if it's actually changed and user has permission
@@ -130,10 +130,8 @@ export default function Profile() {
         updateData.role = formData.role;
       }
 
-      await supabase
-        .from('users')
-        .update(updateData)
-        .eq('email', user.email);
+      const userRef = doc(db, 'users', user.uid || user.id);
+      await updateDoc(userRef, updateData);
 
       setSaveSuccess(true);
       setIsEditing(false);
@@ -661,27 +659,15 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
     setIsLoading(true);
     try {
-      // Supabase: verify current password by signing in
-      const { data: { session } } = await supabase.auth.getSession();
-      const userEmail = session?.user?.email;
-      if (!userEmail) throw new Error('No user logged in');
+      // Firebase: verify current password by reauthenticating
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) throw new Error('No user logged in');
 
-      // Re-authenticate with current password
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: userEmail,
-        password: currentPassword
-      });
-      if (signInErr) {
-        setError('Current password is incorrect');
-        setIsLoading(false);
-        return;
-      }
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
 
       // Update to new password
-      const { error: updateErr } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-      if (updateErr) throw updateErr;
+      await updatePassword(currentUser, newPassword);
       
       setSuccess(true);
       setTimeout(() => onClose(), 2000);

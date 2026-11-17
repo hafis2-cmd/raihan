@@ -30,7 +30,21 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit,
+  getDocs, 
+  getDoc,
+  doc, 
+  updateDoc, 
+  addDoc, 
+  deleteDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -150,38 +164,30 @@ export default function Consultation() {
       return;
     }
 
-    const fetchMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('call_messages')
-          .select('*')
-          .eq('call_id', activeCallId)
-          .order('created_at', { ascending: true });
-        
-        if (error) throw error;
-        setMessages((data || []).map(m => ({
-          id: m.id,
+    const q = query(
+      collection(db, 'calls', activeCallId, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const m = docSnap.data();
+        list.push({
+          id: docSnap.id,
           text: m.text,
-          senderEmail: m.sender_email,
-          senderName: m.sender_name,
-          timestamp: m.created_at
-        })));
-      } catch (err) {
-        console.error("Error fetching call messages:", err);
-      }
-    };
-
-    fetchMessages();
-
-    const channel = supabase
-      .channel(`call-messages-${activeCallId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_messages', filter: `call_id=eq.${activeCallId}` }, () => {
-        fetchMessages();
-      })
-      .subscribe();
+          senderEmail: m.senderEmail,
+          senderName: m.senderName,
+          timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toISOString() : m.timestamp
+        });
+      });
+      setMessages(list);
+    }, (err) => {
+      console.error("Error listening to call messages:", err);
+    });
 
     return () => {
-      channel.unsubscribe();
+      unsubscribe();
     };
   }, [activeCallId]);
 
@@ -195,38 +201,22 @@ export default function Consultation() {
       return;
     }
 
-    const fetchTargetStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('typing_to, is_online, last_seen')
-          .eq('email', targetUser.email)
-          .maybeSingle();
-
-        if (error) throw error;
-        if (data) {
-          setTypingToStatus(data.typing_to || null);
-          setTargetUserStatus({
-            isOnline: data.is_online || false,
-            lastSeen: data.last_seen
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching user status:", err);
+    const q = query(collection(db, 'users'), where('email', '==', targetUser.email));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        setTypingToStatus(data.typingTo || null);
+        setTargetUserStatus({
+          isOnline: data.isOnline || false,
+          lastSeen: data.lastSeen
+        });
       }
-    };
-
-    fetchTargetStatus();
-
-    const channel = supabase
-      .channel(`user-status-${targetUser.email}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `email=eq.${targetUser.email}` }, () => {
-        fetchTargetStatus();
-      })
-      .subscribe();
+    }, (err) => {
+      console.error("Error listening to user status:", err);
+    });
 
     return () => {
-      channel.unsubscribe();
+      unsubscribe();
     };
   }, [targetUser?.email]);
 
@@ -237,12 +227,10 @@ export default function Consultation() {
 
     const updateTypingStatus = async (isTyping: boolean) => {
       try {
-        await supabase
-          .from('users')
-          .update({
-            typing_to: isTyping ? targetUser.email : null
-          })
-          .eq('id', user.id);
+        const userRef = doc(db, 'users', user.uid || user.id);
+        await updateDoc(userRef, {
+          typingTo: isTyping ? targetUser.email : null
+        });
       } catch (e) {}
     };
 
@@ -264,19 +252,15 @@ export default function Consultation() {
     if (!newMessage.trim() || !activeCallId || !profile?.email || !user) return;
 
     try {
-      await supabase
-        .from('users')
-        .update({ typing_to: null })
-        .eq('id', user.id);
+      const userRef = doc(db, 'users', user.uid || user.id);
+      await updateDoc(userRef, { typingTo: null });
 
-      await supabase
-        .from('call_messages')
-        .insert({
-          call_id: activeCallId,
-          text: newMessage,
-          sender_email: profile.email,
-          sender_name: profile.name || profile.email.split('@')[0]
-        });
+      await addDoc(collection(db, 'calls', activeCallId, 'messages'), {
+        text: newMessage,
+        senderEmail: profile.email,
+        senderName: profile.name || profile.email.split('@')[0],
+        timestamp: new Date()
+      });
 
       setNewMessage('');
     } catch (err) {
@@ -301,45 +285,34 @@ export default function Consultation() {
   useEffect(() => {
     if (!profile) return;
     
-    const fetchUsers = async () => {
-      try {
-        const targetRole = profile.role === 'Patient' ? 'Doctor' : 'Patient';
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('role', targetRole)
-          .limit(15);
-
-        if (error) throw error;
-        const usersMapped = (data || []).map(u => ({
-          id: u.id,
+    const targetRole = profile.role === 'Patient' ? 'Doctor' : 'Patient';
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', targetRole)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const u = docSnap.data();
+        list.push({
+          id: docSnap.id,
           email: u.email,
           name: u.name,
           role: u.role,
           specialty: u.specialty,
-          image: u.image || u.photo_url,
-          isOnline: u.is_online,
-          lastSeen: u.last_seen
-        }));
-
-        if (profile.role === 'Patient') setDoctorsList(usersMapped);
-        else setPatientsList(usersMapped);
-      } catch (err) {
-        console.error("Error listing users:", err);
-      }
-    };
-
-    fetchUsers();
-
-    const channel = supabase
-      .channel('consult-users-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        fetchUsers();
-      })
-      .subscribe();
+          image: u.image || u.photoURL,
+          isOnline: u.isOnline,
+          lastSeen: u.lastSeen
+        });
+      });
+      if (profile.role === 'Patient') setDoctorsList(list.slice(0, 15));
+      else setPatientsList(list.slice(0, 15));
+    }, (err) => {
+      console.error("Error listing users:", err);
+    });
 
     return () => {
-      channel.unsubscribe();
+      unsubscribe();
     };
   }, [profile, targetUser]);
 
@@ -358,25 +331,19 @@ export default function Consultation() {
     return () => clearInterval(interval);
   }, [callStatus, startTime]);
 
-  // Initialize target user and handle incoming call from state
   useEffect(() => {
     if (location.state?.incomingCallId) {
       const getIncomingCall = async () => {
         try {
-          const { data, error } = await supabase
-            .from('calls')
-            .select('*')
-            .eq('id', location.state.incomingCallId)
-            .maybeSingle();
-
-          if (error) throw error;
-          if (data) {
+          const docSnap = await getDoc(doc(db, 'calls', location.state.incomingCallId));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
             const mapped = {
-              id: data.id,
-              callerEmail: data.caller_email,
-              callerName: data.caller_name,
-              receiverEmail: data.receiver_email,
-              receiverName: data.receiver_name,
+              id: docSnap.id,
+              callerEmail: data.callerEmail,
+              callerName: data.callerName,
+              receiverEmail: data.receiverEmail,
+              receiverName: data.receiverName,
               status: data.status,
               offer: data.offer,
               answer: data.answer
@@ -387,7 +354,7 @@ export default function Consultation() {
               setCallStatus('incoming');
             } else if (data.status === 'active') {
               setIncomingCall(mapped);
-              setActiveCallId(data.id);
+              setActiveCallId(docSnap.id);
               setCallStatus('active');
             }
           }
@@ -407,26 +374,25 @@ export default function Consultation() {
       // Look for upcoming appointments to suggest a target
       const fetchSuggestedTarget = async () => {
         try {
-          const field = profile.role === 'Doctor' ? 'doctor_email' : 'patient_email';
-          const { data, error } = await supabase
-            .from('appointments')
-            .select('*')
-            .eq(field, profile.email)
-            .eq('status', 'booked')
-            .limit(1)
-            .maybeSingle();
-
-          if (error) throw error;
-          if (data) {
+          const field = profile.role === 'Doctor' ? 'doctorEmail' : 'patientEmail';
+          const q = query(
+            collection(db, 'appointments'),
+            where(field, '==', profile.email),
+            where('status', '==', 'booked'),
+            limit(1)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const data = snap.docs[0].data();
             if (profile.role === 'Patient') {
               setTargetUser({
-                email: data.doctor_email || 'doctor@telemed.ai',
-                name: data.doctor_name
+                email: data.doctorEmail || 'doctor@telemed.ai',
+                name: data.doctorName
               });
             } else {
               setTargetUser({
-                email: data.patient_email,
-                name: data.patient_name || data.patient_email.split('@')[0]
+                email: data.patientEmail,
+                name: data.patientName || data.patientEmail.split('@')[0]
               });
             }
           }
@@ -443,59 +409,47 @@ export default function Consultation() {
   useEffect(() => {
     if (!profile?.email) return;
 
-    const fetchIncomingCall = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('receiver_email', profile.email)
-          .eq('status', 'calling')
-          .limit(1)
-          .maybeSingle();
+    const q = query(
+      collection(db, 'calls'),
+      where('receiverEmail', '==', profile.email),
+      where('status', '==', 'calling')
+    );
 
-        if (error) throw error;
-        if (data) {
-          const mapped = {
-            id: data.id,
-            callerEmail: data.caller_email,
-            callerName: data.caller_name,
-            receiverEmail: data.receiver_email,
-            receiverName: data.receiver_name,
-            status: data.status,
-            offer: data.offer,
-            answer: data.answer
-          };
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const docSnap = snapshot.docs[0];
+        const data = docSnap.data();
+        const mapped = {
+          id: docSnap.id,
+          callerEmail: data.callerEmail,
+          callerName: data.callerName,
+          receiverEmail: data.receiverEmail,
+          receiverName: data.receiverName,
+          status: data.status,
+          offer: data.offer,
+          answer: data.answer
+        };
 
-          setCallStatus(prevStatus => {
-            if (prevStatus === 'idle') {
-              setIncomingCall(mapped);
-              return 'incoming';
-            } else {
-              if (activeCallId !== data.id && (!incomingCall || incomingCall.id !== data.id)) {
-                setWaitingCall(mapped);
-              }
+        setCallStatus(prevStatus => {
+          if (prevStatus === 'idle') {
+            setIncomingCall(mapped);
+            return 'incoming';
+          } else {
+            if (activeCallId !== docSnap.id && (!incomingCall || incomingCall.id !== docSnap.id)) {
+              setWaitingCall(mapped);
             }
-            return prevStatus;
-          });
-        } else {
-          setIncomingCall(null);
-        }
-      } catch (err) {
-        console.error("Error in incoming calls fetch:", err);
+          }
+          return prevStatus;
+        });
+      } else {
+        setIncomingCall(null);
       }
-    };
-
-    fetchIncomingCall();
-
-    const channel = supabase
-      .channel(`consult-incoming-${profile.email}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `receiver_email=eq.${profile.email}` }, () => {
-        fetchIncomingCall();
-      })
-      .subscribe();
+    }, (err) => {
+      console.error("Error in incoming calls listener:", err);
+    });
 
     return () => {
-      channel.unsubscribe();
+      unsubscribe();
     };
   }, [profile?.email]);
 
@@ -503,45 +457,37 @@ export default function Consultation() {
   useEffect(() => {
     if (!profile?.email) return;
 
-    const fetchHistory = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('call_history')
-          .select('*')
-          .contains('participants', [profile.email])
-          .order('start_time', { ascending: false })
-          .limit(10);
+    const q = query(
+      collection(db, 'call_history'),
+      where('participants', 'array-contains', profile.email)
+    );
 
-        if (error) throw error;
-        setCallHistory((data || []).map(h => ({
-          id: h.id,
-          callerEmail: h.caller_email,
-          callerName: h.caller_name,
-          receiverEmail: h.receiver_email,
-          receiverName: h.receiver_name,
-          startTime: h.start_time,
-          endTime: h.end_time,
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const historyList: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const h = docSnap.data();
+        historyList.push({
+          id: docSnap.id,
+          callerEmail: h.callerEmail,
+          callerName: h.callerName,
+          receiverEmail: h.receiverEmail,
+          receiverName: h.receiverName,
+          startTime: h.startTime?.toDate ? h.startTime.toDate().toISOString() : h.startTime,
+          endTime: h.endTime?.toDate ? h.endTime.toDate().toISOString() : h.endTime,
           duration: h.duration,
           status: h.status
-        })));
-        setLoadingHistory(false);
-      } catch (err) {
-        console.error("Error loading call history:", err);
-        setLoadingHistory(false);
-      }
-    };
-
-    fetchHistory();
-
-    const channel = supabase
-      .channel(`consult-history-${profile.email}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_history' }, () => {
-        fetchHistory();
-      })
-      .subscribe();
+        });
+      });
+      historyList.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      setCallHistory(historyList.slice(0, 10));
+      setLoadingHistory(false);
+    }, (err) => {
+      console.error("Error loading call history:", err);
+      setLoadingHistory(false);
+    });
 
     return () => {
-      channel.unsubscribe();
+      unsubscribe();
     };
   }, [profile?.email]);
 
@@ -734,28 +680,19 @@ export default function Consultation() {
         (pc.current as any).reconnectAttempts = reconnectAttempts + 1;
         setError(`Reconnecting (${reconnectAttempts + 1}/5)...`);
         
-        const { data: callData, error } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('id', activeCallId)
-          .maybeSingle();
-
-        if (error || !callData) return;
-        const isCaller = callData.caller_email === profile?.email;
+        const docSnap = await getDoc(doc(db, 'calls', activeCallId));
+        if (!docSnap.exists()) return;
+        const callData = docSnap.data();
+        const isCaller = callData.callerEmail === profile?.email;
         
         if (isCaller) {
           console.log("Initiating ICE Restart as Caller");
           const offer = await pc.current.createOffer({ iceRestart: true });
           await pc.current.setLocalDescription(offer);
           
-          await supabase
-            .from('calls')
-            .update({ 
-              offer: { sdp: offer.sdp, type: offer.type },
-              reconnect_token: Math.random().toString(36).substring(7),
-              last_offer_at: new Date().toISOString()
-            })
-            .eq('id', activeCallId);
+          await updateDoc(doc(db, 'calls', activeCallId), { 
+            offer: { sdp: offer.sdp, type: offer.type }
+          });
         }
       } catch (err) {
         console.error("Reconnection attempt failed:", err);
@@ -794,26 +731,18 @@ export default function Consultation() {
         if (!pc.current || !activeCallId || pc.current.signalingState !== 'stable') return;
         
         try {
-          const { data: callData, error } = await supabase
-            .from('calls')
-            .select('*')
-            .eq('id', activeCallId)
-            .maybeSingle();
-
-          if (error || !callData) return;
-          if (callData.caller_email !== profile?.email) return;
+          const docSnap = await getDoc(doc(db, 'calls', activeCallId));
+          if (!docSnap.exists()) return;
+          const callData = docSnap.data();
+          if (callData.callerEmail !== profile?.email) return;
 
           console.log("Negotiation needed - creating offer");
           const offer = await pc.current.createOffer();
           await pc.current.setLocalDescription(offer);
 
-          await supabase
-            .from('calls')
-            .update({ 
-              offer: { sdp: offer.sdp, type: offer.type },
-              last_offer_at: new Date().toISOString()
-            })
-            .eq('id', activeCallId);
+          await updateDoc(doc(db, 'calls', activeCallId), { 
+            offer: { sdp: offer.sdp, type: offer.type }
+          });
         } catch (err) {
           console.error("Onnegotiationneeded failed:", err);
         }
@@ -852,36 +781,25 @@ export default function Consultation() {
       setCallStatus('calling');
       setupPeerConnection();
 
-      // Create new call record in Supabase
-      const { data: callRow, error: callErr } = await supabase
-        .from('calls')
-        .insert({
-          caller_email: profile.email,
-          caller_name: profile.name || profile.email.split('@')[0],
-          receiver_email: targetUser.email,
-          receiver_name: targetUser.name,
-          status: 'calling'
-        })
-        .select('*')
-        .single();
-
-      if (callErr || !callRow) throw callErr || new Error("Failed to create call row.");
+      // Create new call record in Firestore
+      const callDocRef = await addDoc(collection(db, 'calls'), {
+        callerEmail: profile.email,
+        callerName: profile.name || profile.email.split('@')[0],
+        receiverEmail: targetUser.email,
+        receiverName: targetUser.name,
+        status: 'calling',
+        timestamp: new Date()
+      });
       
-      const callId = callRow.id;
+      const callId = callDocRef.id;
       setActiveCallId(callId);
 
       pc.current!.onicecandidate = (event) => {
         if (event.candidate) {
-          (async () => {
-            const { error } = await supabase
-              .from('call_candidates')
-              .insert({
-                call_id: callId,
-                candidate: event.candidate.toJSON(),
-                candidate_type: 'caller'
-              });
-            if (error) console.error("Error inserting caller candidate:", error);
-          })();
+          addDoc(collection(db, 'calls', callId, 'callerCandidates'), {
+            candidate: event.candidate.toJSON(),
+            timestamp: new Date()
+          }).catch(err => console.error("Error inserting caller candidate:", err));
         }
       };
 
@@ -893,23 +811,15 @@ export default function Consultation() {
         type: offerDescription.type,
       };
 
-      await supabase
-        .from('calls')
-        .update({ offer })
-        .eq('id', callId);
+      await updateDoc(doc(db, 'calls', callId), { offer });
 
-      const fetchCallState = async () => {
-        const { data, error } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('id', callId)
-          .maybeSingle();
-
-        if (error || !data) return;
+      const unsubscribeCall = onSnapshot(doc(db, 'calls', callId), (docSnap) => {
+        if (!docSnap.exists()) return;
+        const data = docSnap.data();
 
         // Handle answer
         if (data.answer && pc.current?.signalingState === 'have-local-offer') {
-          const answerDescription = new RTCSessionDescription(data.answer);
+          const answerDescription = new RTCSessionDescription(data.answer as RTCSessionDescriptionInit);
           pc.current?.setRemoteDescription(answerDescription).catch(err => {
             console.error("Error setting remote description:", err);
             setError("Failed to establish connection with the other party.");
@@ -920,37 +830,29 @@ export default function Consultation() {
           endCall();
         }
 
-        if (data.status === 'onHold' && activeCallId === data.id) {
+        if (data.status === 'onHold' && activeCallId === docSnap.id) {
           setError("The other party has put the call on hold.");
-        } else if (data.status === 'active' && activeCallId === data.id && prevStatus.current === 'onHold') {
+        } else if (data.status === 'active' && activeCallId === docSnap.id && prevStatus.current === 'onHold') {
           setError(null);
         }
         prevStatus.current = data.status;
-      };
+      });
 
-      const callChannel = supabase
-        .channel(`active-call-${callId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `id=eq.${callId}` }, () => {
-          fetchCallState();
-        })
-        .subscribe();
+      activeCallListeners.current.push(unsubscribeCall);
 
-      activeCallListeners.current.push(() => callChannel.unsubscribe());
-
-      const candChannel = supabase
-        .channel(`active-candidates-${callId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_candidates', filter: `call_id=eq.${callId}` }, (payload) => {
-          const row = payload.new;
-          if (row.candidate_type === 'receiver') {
-            const candidate = new RTCIceCandidate(row.candidate);
+      const unsubscribeCandidates = onSnapshot(collection(db, 'calls', callId, 'receiverCandidates'), (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            const candidate = new RTCIceCandidate(data.candidate);
             pc.current?.addIceCandidate(candidate).catch(err => {
               console.error("Error adding receiver ICE candidate:", err);
             });
           }
-        })
-        .subscribe();
+        });
+      });
 
-      activeCallListeners.current.push(() => candChannel.unsubscribe());
+      activeCallListeners.current.push(unsubscribeCandidates);
     } catch (err) {
       console.error("Error starting call:", err);
       setError("An error occurred while trying to start the call. Please try again.");
@@ -963,10 +865,7 @@ export default function Consultation() {
     
     try {
       // Put current call on hold
-      await supabase
-        .from('calls')
-        .update({ status: 'onHold' })
-        .eq('id', activeCallId);
+      await updateDoc(doc(db, 'calls', activeCallId), { status: 'onHold' });
 
       setHeldCallId(activeCallId);
       cleanupPeerConnection();
@@ -989,19 +888,16 @@ export default function Consultation() {
         await endCall();
       }
       
-      const { data, error } = await supabase
-        .from('calls')
-        .select('*')
-        .eq('id', heldCallId)
-        .maybeSingle();
+      const docSnap = await getDoc(doc(db, 'calls', heldCallId));
 
-      if (!error && data) {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
         setIncomingCall({
-          id: data.id,
-          callerEmail: data.caller_email,
-          callerName: data.caller_name,
-          receiverEmail: data.receiver_email,
-          receiverName: data.receiver_name,
+          id: docSnap.id,
+          callerEmail: data.callerEmail,
+          callerName: data.callerName,
+          receiverEmail: data.receiverEmail,
+          receiverName: data.receiverName,
           status: data.status,
           offer: data.offer,
           answer: data.answer
@@ -1045,16 +941,10 @@ export default function Consultation() {
 
       pc.current!.onicecandidate = (event) => {
         if (event.candidate) {
-          (async () => {
-            const { error } = await supabase
-              .from('call_candidates')
-              .insert({
-                call_id: callId,
-                candidate: event.candidate.toJSON(),
-                candidate_type: 'receiver'
-              });
-            if (error) console.error("Error inserting receiver candidate:", error);
-          })();
+          addDoc(collection(db, 'calls', callId, 'receiverCandidates'), {
+            candidate: event.candidate.toJSON(),
+            timestamp: new Date()
+          }).catch(err => console.error("Error inserting receiver candidate:", err));
         }
       };
 
@@ -1069,34 +959,26 @@ export default function Consultation() {
         sdp: answerDescription.sdp,
       };
 
-      await supabase
-        .from('calls')
-        .update({ answer, status: 'active' })
-        .eq('id', callId);
+      await updateDoc(doc(db, 'calls', callId), { answer, status: 'active' });
 
-      const candChannel = supabase
-        .channel(`answering-candidates-${callId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_candidates', filter: `call_id=eq.${callId}` }, (payload) => {
-          const row = payload.new;
-          if (row.candidate_type === 'caller') {
-            const candidate = new RTCIceCandidate(row.candidate);
+      // Listen for caller candidates
+      const unsubscribeCandidates = onSnapshot(collection(db, 'calls', callId, 'callerCandidates'), (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            const candidate = new RTCIceCandidate(data.candidate);
             pc.current?.addIceCandidate(candidate).catch(err => {
               console.error("Error adding caller ICE candidate:", err);
             });
           }
-        })
-        .subscribe();
+        });
+      });
+      activeCallListeners.current.push(unsubscribeCandidates);
 
-      activeCallListeners.current.push(() => candChannel.unsubscribe());
-
-      const fetchCallState = async () => {
-        const { data, error } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('id', callId)
-          .maybeSingle();
-
-        if (error || !data) return;
+      // Listen for call state updates
+      const unsubscribeCall = onSnapshot(doc(db, 'calls', callId), async (docSnap) => {
+        if (!docSnap.exists()) return;
+        const data = docSnap.data();
 
         // Handle mid-call offer (Renegotiation / Reconnection)
         if (data.offer && pc.current?.signalingState === 'stable') {
@@ -1109,10 +991,7 @@ export default function Consultation() {
               type: answerDescription.type,
               sdp: answerDescription.sdp,
             };
-            await supabase
-              .from('calls')
-              .update({ answer, last_offer_at: new Date().toISOString() })
-              .eq('id', callId);
+            await updateDoc(doc(db, 'calls', callId), { answer });
           } catch (err) {
             console.error("Error handling renegotiation offer:", err);
           }
@@ -1122,22 +1001,14 @@ export default function Consultation() {
           endCall();
         }
         
-        if (data.status === 'onHold' && activeCallId === data.id) {
+        if (data.status === 'onHold' && activeCallId === docSnap.id) {
           setError("The other party has put the call on hold.");
-        } else if (data.status === 'active' && activeCallId === data.id && prevStatus.current === 'onHold') {
+        } else if (data.status === 'active' && activeCallId === docSnap.id && prevStatus.current === 'onHold') {
           setError(null);
         }
         prevStatus.current = data.status;
-      };
-
-      const callChannel = supabase
-        .channel(`answering-call-${callId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `id=eq.${callId}` }, () => {
-          fetchCallState();
-        })
-        .subscribe();
-
-      activeCallListeners.current.push(() => callChannel.unsubscribe());
+      });
+      activeCallListeners.current.push(unsubscribeCall);
     } catch (err) {
       console.error("Error answering call:", err);
       setError("Failed to join the consultation. Please try again.");
@@ -1148,13 +1019,10 @@ export default function Consultation() {
   const endCall = async () => {
     if (activeCallId) {
       try {
-        const { data: callData, error } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('id', activeCallId)
-          .maybeSingle();
-
-        if (error || !callData) return;
+        const docRef = doc(db, 'calls', activeCallId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return;
+        const callData = docSnap.data();
         
         // Prevent recursive updates if already ended
         if (callData.status === 'ended') {
@@ -1162,17 +1030,14 @@ export default function Consultation() {
           return;
         }
 
-        await supabase
-          .from('calls')
-          .update({ status: 'ended' })
-          .eq('id', activeCallId);
+        await updateDoc(docRef, { status: 'ended' });
         
         // Save to history if it was an active call
         if (profile) {
-          const callerEmail = callData.caller_email;
-          const callerName = callData.caller_name;
-          const receiverEmail = callData.receiver_email;
-          const receiverName = callData.receiver_name;
+          const callerEmail = callData.callerEmail;
+          const callerName = callData.callerName;
+          const receiverEmail = callData.receiverEmail;
+          const receiverName = callData.receiverName;
 
           const endTime = new Date();
           const duration = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
@@ -1180,19 +1045,18 @@ export default function Consultation() {
 
           const participants = [callerEmail, receiverEmail].filter(Boolean) as string[];
           
-          await supabase
-            .from('call_history')
-            .insert({
-              caller_email: callerEmail,
-              caller_name: callerName,
-              receiver_email: receiverEmail,
-              receiver_name: receiverName,
-              start_time: startTime ? startTime.toISOString() : new Date().toISOString(),
-              end_time: endTime.toISOString(),
-              duration: duration,
-              status: finalStatus,
-              participants
-            });
+          await addDoc(collection(db, 'call_history'), {
+            callerEmail,
+            callerName,
+            receiverEmail,
+            receiverName,
+            startTime: startTime ? startTime : new Date(),
+            endTime: endTime,
+            duration: duration,
+            status: finalStatus,
+            participants,
+            timestamp: new Date()
+          });
         }
       } catch (err) {
         console.error("Error ending call/saving history:", err);
@@ -1259,10 +1123,7 @@ export default function Consultation() {
   const declineCall = async () => {
     if (incomingCall) {
       try {
-        await supabase
-          .from('calls')
-          .update({ status: 'ended' })
-          .eq('id', incomingCall.id);
+        await updateDoc(doc(db, 'calls', incomingCall.id), { status: 'ended' });
       } catch (err) {
         console.error("Error declining call:", err);
       }

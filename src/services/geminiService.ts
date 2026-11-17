@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { auth } from "../firebase";
 import API_BASE_URL from "../config";
 
 // Gemini Service - Proxying all AI logic safely through our secure Express server endpoints
@@ -11,8 +11,7 @@ export interface TriageHistoryItem {
 
 export async function getTriageNextQuestion(category: string, initialSymptom: string, history: TriageHistoryItem[]) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await auth.currentUser?.getIdToken();
     const response = await fetch(`${API_BASE_URL}/api/gemini/triage/next-question`, {
       method: "POST",
       headers: {
@@ -41,8 +40,7 @@ export async function analyzeSymptoms(
   triageHistory?: TriageHistoryItem[]
 ) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await auth.currentUser?.getIdToken();
     const response = await fetch(`${API_BASE_URL}/api/gemini/analyze`, {
       method: "POST",
       headers: {
@@ -86,8 +84,7 @@ export async function analyzeSymptoms(
 
 export async function parseMedicalReport(imageBase64: string, disease: string) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await auth.currentUser?.getIdToken();
     const response = await fetch(`${API_BASE_URL}/api/gemini/ocr`, {
       method: "POST",
       headers: {
@@ -110,8 +107,7 @@ export async function parseMedicalReport(imageBase64: string, disease: string) {
 
 export async function findNearbyPharmacies(location: string) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await auth.currentUser?.getIdToken();
     const response = await fetch(`${API_BASE_URL}/api/gemini/pharmacies`, {
       method: "POST",
       headers: {

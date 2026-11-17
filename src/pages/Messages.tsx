@@ -17,8 +17,23 @@ import {
   Plus,
   X
 } from 'lucide-react';
-import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit,
+  getDocs, 
+  getDoc,
+  setDoc,
+  doc, 
+  updateDoc, 
+  addDoc, 
+  deleteDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -76,42 +91,37 @@ export default function Messages() {
   useEffect(() => {
     if (!profile?.email) return;
 
-    const fetchConversations = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('conversations')
-          .select('*')
-          .contains('participants', [profile.email])
-          .order('last_message_timestamp', { ascending: false });
-        
-        if (error) throw error;
-        setConversations((data || []).map((d: any) => ({
-          id: d.id,
+    const q = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', profile.email)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: Conversation[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        list.push({
+          id: docSnap.id,
           participants: d.participants,
-          participantsData: d.participants_data || {},
-          lastMessage: d.last_message,
-          lastMessageTimestamp: d.last_message_timestamp,
+          participantsData: d.participantsData || {},
+          lastMessage: d.lastMessage,
+          lastMessageTimestamp: d.lastMessageTimestamp?.toDate ? d.lastMessageTimestamp.toDate().toISOString() : d.lastMessageTimestamp,
           typing: d.typing || {},
-          isAiBot: d.is_ai_bot || false,
-          createdAt: d.created_at
-        })));
-      } catch (err) {
-        console.error('Error fetching conversations:', err);
-      } finally {
-        setLoading(false);
-      }
+          isAiBot: d.isAiBot || false,
+          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt
+        } as Conversation);
+      });
+      list.sort((a, b) => new Date(b.lastMessageTimestamp || b.createdAt).getTime() - new Date(a.lastMessageTimestamp || a.createdAt).getTime());
+      setConversations(list);
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching conversations:', err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
-
-    fetchConversations();
-
-    const channel = supabase
-      .channel('conversations-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
-        fetchConversations();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [profile?.email]);
 
   // Sync selected chat if it updates in the background
@@ -133,17 +143,18 @@ export default function Messages() {
       setSearchingUsers(true);
       try {
         const targetRole = profile.role === 'Patient' ? 'Doctor' : 'Patient';
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('role', targetRole);
-        
-        if (error) throw error;
-        const results = (data || [])
-          .filter((u: any) => 
+        const q = query(collection(db, 'users'), where('role', '==', targetRole));
+        const snapshot = await getDocs(q);
+        const results: any[] = [];
+        snapshot.forEach((docSnap) => {
+          const u = docSnap.data();
+          if (
             u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
             u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
-          );
+          ) {
+            results.push({ id: docSnap.id, ...u });
+          }
+        });
         setSearchResults(results);
       } catch (error) {
         console.error('Error searching users:', error);
@@ -157,7 +168,6 @@ export default function Messages() {
   }, [userSearchQuery, profile?.role]);
 
   const handleStartNewChat = async (targetUser: any) => {
-    // Check if conversation already exists
     const existing = conversations.find(c => 
       c.participants.includes(targetUser.email) && !c.isAiBot
     );
@@ -167,21 +177,19 @@ export default function Messages() {
     } else {
       const convId = [profile!.email, targetUser.email].sort().join('_');
       const participantsData = {
-        [profile!.email]: { name: profile!.name || 'Me', role: profile!.role || 'User' },
-        [targetUser.email]: { name: targetUser.name || targetUser.email.split('@')[0], role: targetUser.role || 'User' }
+        [profile!.email.replace(/\./g, '_')]: { name: profile!.name || 'Me', role: profile!.role || 'User' },
+        [targetUser.email.replace(/\./g, '_')]: { name: targetUser.name || targetUser.email.split('@')[0], role: targetUser.role || 'User' }
       };
 
       try {
-        const { error } = await supabase
-          .from('conversations')
-          .upsert({
-            id: convId,
-            participants: [profile!.email, targetUser.email],
-            participants_data: participantsData,
-            last_message_timestamp: new Date().toISOString()
-          }, { onConflict: 'id' });
+        const convRef = doc(db, 'conversations', convId);
+        await setDoc(convRef, {
+          participants: [profile!.email, targetUser.email],
+          participantsData,
+          lastMessageTimestamp: new Date(),
+          createdAt: new Date()
+        }, { merge: true });
         
-        if (error) throw error;
         setSelectedChat({ id: convId, participants: [profile!.email, targetUser.email], participantsData, createdAt: new Date().toISOString() } as Conversation);
       } catch (error) {
         console.error('Error creating conversation:', error);
@@ -199,29 +207,29 @@ export default function Messages() {
     if (existing) {
       setSelectedChat(existing);
     } else {
-      const convId = `ai_bot_${profile.email}`;
+      const convId = `ai_bot_${profile.email.replace(/\./g, '_')}`;
       const welcomeMsg = "Hello! I'm your Health AI Bot. How can I help you today?";
       const participantsData = {
-        [profile.email]: { name: profile.name || 'Me', role: profile.role || 'User' },
-        [aiBotParticipant.email]: { name: aiBotParticipant.name, role: aiBotParticipant.role }
+        [profile.email.replace(/\./g, '_')]: { name: profile.name || 'Me', role: profile.role || 'User' },
+        [aiBotParticipant.email.replace(/\./g, '_')]: { name: aiBotParticipant.name, role: aiBotParticipant.role }
       };
 
       try {
-        await supabase.from('conversations').upsert({
-          id: convId,
+        await setDoc(doc(db, 'conversations', convId), {
           participants: [profile.email, aiBotParticipant.email],
-          participants_data: participantsData,
-          is_ai_bot: true,
-          last_message: welcomeMsg,
-          last_message_timestamp: new Date().toISOString()
-        }, { onConflict: 'id' });
+          participantsData,
+          isAiBot: true,
+          lastMessage: welcomeMsg,
+          lastMessageTimestamp: new Date(),
+          createdAt: new Date()
+        }, { merge: true });
 
-        await supabase.from('messages').insert({
-          conversation_id: convId,
+        await addDoc(collection(db, 'conversations', convId, 'messages'), {
           text: welcomeMsg,
-          sender_email: aiBotParticipant.email,
-          sender_name: aiBotParticipant.name,
-          is_ai_generated: true
+          senderEmail: aiBotParticipant.email,
+          senderName: aiBotParticipant.name,
+          isAiGenerated: true,
+          timestamp: new Date()
         });
 
         setSelectedChat({ id: convId, participants: [profile.email, aiBotParticipant.email], participantsData, isAiBot: true, lastMessage: welcomeMsg, createdAt: new Date().toISOString() } as Conversation);
@@ -240,13 +248,10 @@ export default function Messages() {
         setSelectedChat(existing);
       } else {
         const fetchUser = async () => {
-          const { data } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', targetEmail)
-            .limit(1);
-          if (data && data.length > 0) {
-            handleStartNewChat(data[0]);
+          const q = query(collection(db, 'users'), where('email', '==', targetEmail), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            handleStartNewChat({ id: snap.docs[0].id, ...snap.docs[0].data() });
           }
         };
         fetchUser();
@@ -261,42 +266,36 @@ export default function Messages() {
       return;
     }
 
-    const fetchMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', selectedChat.id)
-          .order('created_at', { ascending: true });
-        
-        if (error) throw error;
-        setMessages((data || []).map((d: any) => ({
-          id: d.id,
-          senderEmail: d.sender_email,
-          senderName: d.sender_name,
+    const q = query(
+      collection(db, 'conversations', selectedChat.id, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          senderEmail: d.senderEmail,
+          senderName: d.senderName,
           text: d.text,
-          timestamp: d.created_at,
-          readBy: d.read_by || {},
-          isAiGenerated: d.is_ai_generated || false
-        })));
-        setTimeout(() => {
-          scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
-      } catch (err) {
-        console.error('Error fetching messages:', err);
-      }
+          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp,
+          readBy: d.readBy || {},
+          isAiGenerated: d.isAiGenerated || false
+        });
+      });
+      setMessages(list);
+      setTimeout(() => {
+        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }, (err) => {
+      console.error('Error fetching messages:', err);
+    });
+
+    return () => {
+      unsubscribe();
     };
-
-    fetchMessages();
-
-    const channel = supabase
-      .channel(`messages-${selectedChat.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedChat.id}` }, () => {
-        fetchMessages();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [profile?.email, selectedChat?.id]);
 
   // Listen for other user's status
@@ -309,28 +308,23 @@ export default function Messages() {
     const otherEmail = selectedChat.participants.find(e => e !== profile?.email);
     if (!otherEmail) return;
 
-    const fetchStatus = async () => {
-      try {
-        const { data } = await supabase
-          .from('users')
-          .select('is_online, last_seen, typing_to')
-          .eq('email', otherEmail)
-          .single();
-        if (data) {
-          setOtherUserStatus({
-            isOnline: data.is_online || false,
-            lastSeen: data.last_seen,
-            typingTo: data.typing_to || null
-          });
-        }
-      } catch (err) {
-        console.error('Error fetching user status:', err);
+    const q = query(collection(db, 'users'), where('email', '==', otherEmail));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        setOtherUserStatus({
+          isOnline: data.isOnline || false,
+          lastSeen: data.lastSeen,
+          typingTo: data.typingTo || null
+        });
       }
-    };
+    }, (err) => {
+      console.error('Error listening to user status:', err);
+    });
 
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+    };
   }, [selectedChat?.id, profile?.email]);
 
   // Mark messages as read
@@ -338,18 +332,17 @@ export default function Messages() {
     if (!profile?.email || !selectedChat || messages.length === 0) return;
 
     const unreadMessages = messages.filter(
-      msg => msg.senderEmail !== profile.email && (!msg.readBy || !msg.readBy[profile.email!])
+      msg => msg.senderEmail !== profile.email && (!msg.readBy || !msg.readBy[profile.email.replace(/\./g, '_')])
     );
 
     if (unreadMessages.length > 0) {
       const markAsRead = async () => {
         for (const msg of unreadMessages) {
           try {
-            const updatedReadBy = { ...msg.readBy, [profile.email!]: new Date().toISOString() };
-            await supabase
-              .from('messages')
-              .update({ read_by: updatedReadBy })
-              .eq('id', msg.id);
+            const updatedReadBy = { ...msg.readBy, [profile.email.replace(/\./g, '_')]: new Date().toISOString() };
+            await updateDoc(doc(db, 'conversations', selectedChat.id, 'messages', msg.id), {
+              readBy: updatedReadBy
+            });
           } catch (error) {
             console.error('Error marking message as read:', error);
           }
@@ -372,24 +365,24 @@ export default function Messages() {
       const currentTyping = selectedChat.typing || {};
       const emailKey = profile.email.replace(/\./g, '_');
       const { [emailKey]: _, ...rest } = currentTyping;
-      await supabase.from('conversations').update({ typing: rest }).eq('id', selectedChat.id);
+      await updateDoc(doc(db, 'conversations', selectedChat.id), { typing: rest });
     } catch (e) {}
 
     try {
       // Add message
-      await supabase.from('messages').insert({
-        conversation_id: selectedChat.id,
-        sender_email: profile.email,
-        sender_name: profile.name || profile.email.split('@')[0],
+      await addDoc(collection(db, 'conversations', selectedChat.id, 'messages'), {
         text: textPayload,
-        read_by: { [profile.email]: new Date().toISOString() }
+        senderEmail: profile.email,
+        senderName: profile.name || profile.email.split('@')[0],
+        timestamp: new Date(),
+        readBy: { [profile.email.replace(/\./g, '_')]: new Date().toISOString() }
       });
 
       // Update conversation
-      await supabase.from('conversations').update({
-        last_message: textPayload,
-        last_message_timestamp: new Date().toISOString()
-      }).eq('id', selectedChat.id);
+      await updateDoc(doc(db, 'conversations', selectedChat.id), {
+        lastMessage: textPayload,
+        lastMessageTimestamp: new Date()
+      });
 
       // AI Bot Logic
       if (selectedChat.isAiBot) {
@@ -403,21 +396,24 @@ export default function Messages() {
         const aiResponse = await getAiResponse(textPayload, history);
         
         // Add AI message
-        await supabase.from('messages').insert({
-          conversation_id: selectedChat.id,
+        await addDoc(collection(db, 'conversations', selectedChat.id, 'messages'), {
           text: aiResponse,
-          sender_email: aiBotParticipant.email,
-          sender_name: aiBotParticipant.name,
-          is_ai_generated: true,
-          read_by: { [aiBotParticipant.email]: new Date().toISOString(), [profile.email]: new Date().toISOString() }
+          senderEmail: aiBotParticipant.email,
+          senderName: aiBotParticipant.name,
+          isAiGenerated: true,
+          timestamp: new Date(),
+          readBy: { 
+            [aiBotParticipant.email.replace(/\./g, '_')]: new Date().toISOString(), 
+            [profile.email.replace(/\./g, '_')]: new Date().toISOString() 
+          }
         });
 
         // Update conversation with AI response
-        await supabase.from('conversations').update({
-          last_message: aiResponse.slice(0, 50) + (aiResponse.length > 50 ? '...' : ''),
-          last_message_timestamp: new Date().toISOString(),
+        await updateDoc(doc(db, 'conversations', selectedChat.id), {
+          lastMessage: aiResponse.slice(0, 50) + (aiResponse.length > 50 ? '...' : ''),
+          lastMessageTimestamp: new Date(),
           typing: {}
-        }).eq('id', selectedChat.id);
+        });
         
         setIsAiTyping(false);
       }
@@ -444,9 +440,14 @@ export default function Messages() {
           const { [emailKey]: _, ...rest } = currentTyping;
           newTyping = rest;
         }
+
+        const userRef = doc(db, 'users', user.uid || user.id);
+        const convRef = doc(db, 'conversations', selectedChat.id);
+        const targetEmailVal = selectedChat.isAiBot ? 'vitalis_ai' : targetEmail || selectedChat.participants.find(p => p !== profile.email);
+
         await Promise.all([
-          supabase.from('conversations').update({ typing: newTyping }).eq('id', selectedChat.id),
-          supabase.from('users').update({ typing_to: isTyping ? (selectedChat.isAiBot ? 'vitalis_ai' : targetEmail || selectedChat.participants.find(p => p !== profile.email)) : null }).eq('email', profile.email)
+          updateDoc(convRef, { typing: newTyping }),
+          updateDoc(userRef, { typingTo: isTyping ? targetEmailVal : null })
         ]);
       } catch (error) {
         console.error('Error updating typing status:', error);

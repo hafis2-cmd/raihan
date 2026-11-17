@@ -1,5 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../supabase';
+import { auth, db } from '../firebase';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  GoogleAuthProvider, 
+  signInWithPopup,
+  updateProfile as firebaseUpdateProfile
+} from 'firebase/auth';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  serverTimestamp 
+} from 'firebase/firestore';
 import { ADMIN_EMAIL } from '../constants';
 
 interface UserProfile {
@@ -54,32 +69,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }, 3000);
 
-    // Check active session on mount
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        clearTimeout(safetyTimeout);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        clearTimeout(safetyTimeout);
-        console.error("Session fetch failed:", err);
-        setProfile(null);
-        setLoading(false);
-      });
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const activeUser = session?.user ?? null;
-      setUser(activeUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      clearTimeout(safetyTimeout);
+      setUser(currentUser);
       
-      if (activeUser) {
-        await fetchProfile(activeUser.id);
+      if (currentUser) {
+        await fetchProfile(currentUser.uid, currentUser);
       } else {
         setProfile(null);
         setLoading(false);
@@ -88,24 +83,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
-  const fetchProfile = async (uid: string) => {
+  const fetchProfile = async (uid: string, currentUser: any) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', uid)
-        .single();
+      const userDocRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userDocRef);
 
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        setProfile(null);
-      } else if (data) {
-        // Map snake_case database columns back to camelCase for full frontend UI compatibility
+      if (userDoc.exists()) {
+        const data = userDoc.data();
         setProfile({
           email: data.email,
           role: data.role,
@@ -113,92 +102,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: data.name,
           age: data.age,
           gender: data.gender,
-          bloodGroup: data.blood_group,
+          bloodGroup: data.bloodGroup,
           allergies: data.allergies,
-          medicalHistory: data.medical_history,
+          medicalHistory: data.medicalHistory,
           specialty: data.specialty,
           bio: data.bio,
           location: data.location,
           experience: data.experience,
-          photoURL: data.photo_url,
-          image: data.image,
-          isOnline: data.is_online,
-          createdAt: data.created_at
+          photoURL: data.photoURL || data.image,
+          image: data.image || data.photoURL,
+          isOnline: data.isOnline,
+          createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt ? data.updatedAt.toDate() : undefined
+        } as UserProfile);
+      } else {
+        const finalRole = currentUser.email === ADMIN_EMAIL ? 'Admin' : 'Patient';
+        const newProfile = {
+          email: currentUser.email || '',
+          role: finalRole,
+          subscribed: currentUser.email === ADMIN_EMAIL,
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        await setDoc(userDocRef, newProfile);
+        setProfile({
+          ...newProfile,
+          createdAt: new Date(),
+          updatedAt: new Date()
         } as UserProfile);
       }
     } catch (err) {
       console.error('Profile fetch exception:', err);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
   };
 
   const login = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    });
-
-    if (error) throw error;
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+    if (token) {
+      setGoogleToken(token);
+    }
   };
 
   const connectGoogleCalendar = async () => {
-    await login();
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/calendar.events');
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+    if (token) {
+      setGoogleToken(token);
+      return token;
+    }
     return null;
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
-    if (error) throw error;
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const signupWithEmail = async (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Admin') => {
     setLoading(true);
     try {
-      const { data: { user: signedUpUser }, error } = await supabase.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: {
-            display_name: name
-          }
-        }
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      const signedUpUser = userCredential.user;
+
+      await firebaseUpdateProfile(signedUpUser, {
+        displayName: name
       });
 
-      if (error) throw error;
-      if (!signedUpUser) throw new Error("Sign up completed but user profile retrieval failed.");
-
-      // Automatically set role to Admin if email matches
       const finalRole = email === ADMIN_EMAIL ? 'Admin' : role;
+      const userDocRef = doc(db, 'users', signedUpUser.uid);
+      
+      const newProfile = {
+        email,
+        role: finalRole,
+        name,
+        subscribed: email === ADMIN_EMAIL,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
 
-      // Insert profile data to public.users table in Supabase
-      const { error: insertErr } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: signedUpUser.id,
-            email,
-            role: finalRole,
-            name,
-            subscribed: email === ADMIN_EMAIL ? true : false
-          }
-        ]);
-
-      if (insertErr) throw insertErr;
+      await setDoc(userDocRef, newProfile);
 
       setProfile({
         email,
         role: finalRole as any,
         name,
-        subscribed: email === ADMIN_EMAIL ? true : false,
+        subscribed: email === ADMIN_EMAIL,
         createdAt: new Date()
       });
     } catch (error) {
@@ -210,35 +207,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     setGoogleToken(null);
   };
 
   const updateRole = async (role: 'Patient' | 'Doctor' | 'Admin') => {
-    if (!user) return;
+    if (!auth.currentUser) return;
     setLoading(true);
     
     try {
-      const finalRole = user.email === ADMIN_EMAIL ? 'Admin' : role;
+      const finalRole = auth.currentUser.email === ADMIN_EMAIL ? 'Admin' : role;
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
 
-      const { error } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          email: user.email || '',
-          role: finalRole,
-          name: user.user_metadata?.display_name || user.email?.split('@')[0] || '',
-          subscribed: user.email === ADMIN_EMAIL ? true : false
-        });
+      await setDoc(userDocRef, {
+        email: auth.currentUser.email || '',
+        role: finalRole,
+        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || '',
+        subscribed: auth.currentUser.email === ADMIN_EMAIL,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
-      if (error) throw error;
-
-      setProfile({
-        email: user.email || '',
+      setProfile((prev) => prev ? {
+        ...prev,
         role: finalRole as any,
-        subscribed: user.email === ADMIN_EMAIL ? true : false,
-        name: user.user_metadata?.display_name || '',
-        createdAt: new Date()
+        updatedAt: new Date()
+      } : {
+        email: auth.currentUser?.email || '',
+        role: finalRole as any,
+        subscribed: auth.currentUser?.email === ADMIN_EMAIL,
+        name: auth.currentUser?.displayName || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
     } catch (error) {
       console.error("Role update failed:", error);

@@ -22,7 +22,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { collection, query, where, addDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -146,49 +147,43 @@ export default function Subscription() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchSub = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_email', user.email)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(1);
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          const d = data[0];
-          setCurrentSubscription({
-            id: d.id,
-            userEmail: d.user_email,
-            plan: d.plan,
-            status: d.status,
-            amount: d.amount,
-            startDate: d.start_date,
-            endDate: d.end_date,
-            timestamp: d.created_at
-          });
-        } else {
-          setCurrentSubscription(null);
-        }
-      } catch (err) {
-        console.error('Error fetching subscription:', err);
-      } finally {
-        setLoading(false);
+    const q = query(
+      collection(db, 'subscriptions'),
+      where('userEmail', '==', user.email),
+      where('status', '==', 'active')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const docs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as any));
+        docs.sort((a, b) => {
+          const tA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+          const tB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+          return tB - tA;
+        });
+        const d = docs[0];
+        setCurrentSubscription({
+          id: d.id,
+          userEmail: d.userEmail,
+          plan: d.plan,
+          status: d.status,
+          amount: d.amount,
+          startDate: d.startDate?.toDate ? d.startDate.toDate().toISOString() : d.startDate,
+          endDate: d.endDate?.toDate ? d.endDate.toDate().toISOString() : d.endDate,
+          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toISOString() : d.timestamp
+        });
+      } else {
+        setCurrentSubscription(null);
       }
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching subscription:', err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
-
-    fetchSub();
-
-    const channel = supabase
-      .channel('subscription-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
-        fetchSub();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const handleCancelSubscription = async () => {
@@ -196,17 +191,14 @@ export default function Subscription() {
     
     setIsProcessing(true);
     try {
-      // 1. Update subscription status
-      await supabase
-        .from('subscriptions')
-        .update({ status: 'cancelled' })
-        .eq('id', currentSubscription.id);
+      await updateDoc(doc(db, 'subscriptions', currentSubscription.id), {
+        status: 'cancelled'
+      });
 
-      // 2. Update user profile to unsubscribed
-      await supabase
-        .from('users')
-        .update({ subscribed: false })
-        .eq('email', user.email);
+      const userRef = doc(db, 'users', user.uid || user.id);
+      await updateDoc(userRef, {
+        subscribed: false
+      });
 
       setCurrentSubscription(null);
     } catch (error) {
@@ -232,31 +224,30 @@ export default function Subscription() {
         endDate.setFullYear(now.getFullYear() + 1);
       }
 
-      // 1. Create subscription record
-      await supabase.from('subscriptions').insert({
-        user_email: user.email,
+      await addDoc(collection(db, 'subscriptions'), {
+        userEmail: user.email,
         plan: plan.id,
         status: 'active',
         amount: plan.price,
-        start_date: now.toISOString(),
-        end_date: endDate.toISOString()
+        startDate: now,
+        endDate: endDate,
+        timestamp: now
       });
 
-      // 2. Update user profile
-      await supabase
-        .from('users')
-        .update({ subscribed: true })
-        .eq('email', user.email);
+      const userRef = doc(db, 'users', user.uid || user.id);
+      await updateDoc(userRef, {
+        subscribed: true
+      });
 
-      // 3. Create payment record
-      await supabase.from('payments').insert({
-        patient_email: user.email,
-        patient_name: profile.name || user.displayName || 'User',
+      await addDoc(collection(db, 'payments'), {
+        patientEmail: user.email,
+        patientName: profile.name || user.displayName || 'User',
         amount: plan.price,
         currency: 'USD',
         status: 'completed',
         description: `Subscription: ${plan.name}`,
-        method: 'Visa •••• 4242'
+        method: 'Visa •••• 4242',
+        timestamp: now
       });
 
       setSelectedPlan(null);

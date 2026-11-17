@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -7,22 +8,12 @@ import fs from "fs";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import { createClient } from "@supabase/supabase-js";
+import { adminDb } from "./firebase-admin-init";
 import { authMiddleware, AuthenticatedRequest } from "./auth.middleware";
 import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Initialize Supabase Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn("Supabase server configurations are missing. Remote queries will fail.");
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 function handleDatabaseError(error: unknown, operationType: string, path: string | null) {
   const errInfo = {
@@ -816,25 +807,34 @@ Given a disease category, an initial symptom complaint, and any existing chat hi
       }
     }
   });
-
   // Reminder Logic
   const checkReminders = async () => {
     console.log("Checking for appointment reminders...");
+    if (!adminDb) {
+      console.warn("Skipping reminders check: Firestore is not initialized.");
+      return;
+    }
     const now = new Date();
     
     try {
-      const { data: appointments, error } = await supabase
-        .from("appointments")
-        .select("*")
-        .eq("status", "booked");
+      const appointmentsSnapshot = await adminDb
+        .collection("appointments")
+        .where("status", "==", "booked")
+        .get();
 
-      if (error) throw error;
-      if (!appointments) return;
+      if (appointmentsSnapshot.empty) return;
+
+      const appointments: any[] = [];
+      appointmentsSnapshot.forEach((doc) => {
+        appointments.push({ id: doc.id, ...doc.data() });
+      });
 
       for (const app of appointments) {
-        const appDate = app.appointment_date; // YYYY-MM-DD
-        const appTime = app.appointment_time; // HH:MM AM/PM
+        const appDate = app.date; // YYYY-MM-DD
+        const appTime = app.time; // HH:MM AM/PM
         
+        if (!appDate || !appTime) continue;
+
         // Parse appointment time
         const [time, period] = appTime.split(' ');
         let [hours, minutes] = time.split(':').map(Number);
@@ -847,68 +847,76 @@ Given a disease category, an initial symptom complaint, and any existing chat hi
         const diffHours = diffMs / (1000 * 60 * 60);
 
         // 24 Hour Reminder
-        if (diffHours > 0 && diffHours <= 24 && !app.reminder_24h_sent) {
-          console.log(`Sending 24h reminder for appointment ${app.id} to ${app.patient_email} and ${app.doctor_email}`);
+        if (diffHours > 0 && diffHours <= 24 && !app.reminder24hSent) {
+          console.log(`Sending 24h reminder for appointment ${app.id} to ${app.patientEmail} and ${app.doctorEmail}`);
           
           await sendNotification(app, "24h", app.id);
           
-          const { error: updateErr } = await supabase
-            .from("appointments")
-            .update({ reminder_24h_sent: true })
-            .eq("id", app.id);
-          
-          if (updateErr) throw updateErr;
+          await adminDb.collection("appointments").doc(app.id).update({
+            reminder24hSent: true
+          });
         }
 
         // 1 Hour Reminder
-        if (diffHours > 0 && diffHours <= 1 && !app.reminder_1h_sent) {
-          console.log(`Sending 1h reminder for appointment ${app.id} to ${app.patient_email} and ${app.doctor_email}`);
+        if (diffHours > 0 && diffHours <= 1 && !app.reminder1hSent) {
+          console.log(`Sending 1h reminder for appointment ${app.id} to ${app.patientEmail} and ${app.doctorEmail}`);
           
           await sendNotification(app, "1h", app.id);
           
-          const { error: updateErr } = await supabase
-            .from("appointments")
-            .update({ reminder_1h_sent: true })
-            .eq("id", app.id);
-          
-          if (updateErr) throw updateErr;
+          await adminDb.collection("appointments").doc(app.id).update({
+            reminder1hSent: true
+          });
         }
       }
-    } catch (error) {
-      console.error("Error checking reminders:", error);
-      handleDatabaseError(error, "GET", "appointments");
+    } catch (error: any) {
+      if (error?.message?.includes("credentials") || String(error).includes("credentials")) {
+        console.warn("Skipping background reminders check: Google Application Default Credentials (ADC) are not configured. If you wish to run background reminders locally, please set up a service account or authenticate via ADC.");
+      } else {
+        console.error("Error checking reminders:", error);
+        handleDatabaseError(error, "GET", "appointments");
+      }
     }
   };
 
   const sendNotification = async (app: any, type: string, appointmentId: string) => {
     try {
       const message = type === "24h" 
-        ? `Reminder: You have an appointment with ${app.doctor_name} tomorrow at ${app.appointment_time}.`
-        : `Reminder: Your appointment with ${app.doctor_name} is in 1 hour at ${app.appointment_time}.`;
+        ? `Reminder: You have an appointment with ${app.doctorName} tomorrow at ${app.time}.`
+        : `Reminder: Your appointment with ${app.doctorName} is in 1 hour at ${app.time}.`;
 
       // Log to console (simulating SMS/Email)
-      console.log(`[NOTIFICATION] To: ${app.patient_email} | Message: ${message}`);
-      console.log(`[NOTIFICATION] To: ${app.doctor_email} | Message: Reminder: You have an appointment with patient ${app.patient_name} at ${app.appointment_time}.`);
+      console.log(`[NOTIFICATION] To: ${app.patientEmail} | Message: ${message}`);
+      console.log(`[NOTIFICATION] To: ${app.doctorEmail} | Message: Reminder: You have an appointment with patient ${app.patientName} at ${app.time}.`);
 
-      // Save to notifications table for UI visibility
-      const { error: insertErr } = await supabase.from("notifications").insert([
-        {
-          recipient_email: app.patient_email,
-          message,
-          notification_type: "appointment_reminder",
-          appointment_id: appointmentId,
-          sent_via: ["email", "sms"]
-        },
-        {
-          recipient_email: app.doctor_email,
-          message: `Reminder: You have an appointment with patient ${app.patient_name} at ${app.appointment_time}.`,
-          notification_type: "appointment_reminder",
-          appointment_id: appointmentId,
-          sent_via: ["email", "sms"]
-        }
-      ]);
+      if (!adminDb) {
+        console.warn("Skipping notification save: Firestore is not initialized.");
+        return;
+      }
 
-      if (insertErr) throw insertErr;
+      const notificationsRef = adminDb.collection("notifications");
+      const batch = adminDb.batch();
+
+      const patientNotificationRef = notificationsRef.doc();
+      batch.set(patientNotificationRef, {
+        recipientEmail: app.patientEmail,
+        message,
+        type: "appointment_reminder",
+        appointmentId: appointmentId,
+        sentVia: ["email", "sms"],
+        timestamp: new Date()
+      });
+
+      const doctorNotificationRef = notificationsRef.doc();
+      batch.set(doctorNotificationRef, {
+        recipientEmail: app.doctorEmail || app.doctor_email || '',
+        message: `Reminder: You have an appointment with patient ${app.patientName} at ${app.time}.`,
+        type: "appointment_reminder",
+        appointmentId: appointmentId,
+        sentVia: ["email", "sms"],
+        timestamp: new Date()
+      });
+
+      await batch.commit();
     } catch (error) {
       console.error("Error sending notification:", error);
       handleDatabaseError(error, "WRITE", "notifications");

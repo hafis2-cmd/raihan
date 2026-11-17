@@ -68,7 +68,7 @@
   }
   
   /* Background zones and lists hover */
-  .bg-slate-50, .bg-[#F8F9FA] {
+  .bg-slate-50, .bg-\[\#F8F9FA\] {
     background-color: #020617 !important; /* slate-950 */
   }
   .bg-slate-100 {
@@ -165,7 +165,7 @@
     padding-bottom: 1rem !important;
   }
   
-  .rounded-[3rem] {
+  .rounded-\[3rem\] {
     border-radius: 1.25rem !important;
   }
   .rounded-3xl {
@@ -174,7 +174,7 @@
 
   /* Map container fix */
   .min-h-\[500px\] {
-    min-h: 320px !important;
+    min-height: 320px !important;
   }
 }
 

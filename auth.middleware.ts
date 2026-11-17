@@ -1,10 +1,6 @@
+import "dotenv/config";
 import { Request, Response, NextFunction } from "express";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { adminAuth } from "./firebase-admin-init";
 
 export interface AuthenticatedRequest extends Request {
   user?: any;
@@ -18,11 +14,13 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
 
   const token = authHeader.split(" ")[1];
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      return res.status(401).json({ error: "Unauthorized: Invalid or expired Supabase token" });
-    }
-    req.user = user;
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    req.user = {
+      id: decodedToken.uid,
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      ...decodedToken
+    };
     next();
   } catch (error) {
     console.error("JWT verification failed:", error);

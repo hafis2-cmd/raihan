@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { 
   Activity, 
@@ -34,34 +35,33 @@ export default function SharedDiagnosis() {
       }
 
       try {
-        const { data, error: fetchErr } = await supabase
-          .from('shared_diagnoses')
-          .select('*')
-          .eq('id', shareId)
-          .single();
+        const docRef = doc(db, 'shared_diagnoses', shareId);
+        const docSnap = await getDoc(docRef);
 
-        if (fetchErr || !data) {
+        if (!docSnap.exists()) {
           setError('The requested secure link does not exist or has been removed.');
           setLoading(false);
           return;
         }
 
+        const data = docSnap.data();
+
         // Check expiration
-        const expiresAt = new Date(data.expires_at);
+        const expiresAt = new Date(data.expires_at || data.expiresAt);
         const now = new Date();
 
         if (now > expiresAt) {
           setIsExpired(true);
         } else {
           setReport({
-            patientName: data.patient_name,
-            patientEmail: data.patient_email,
-            doctorEmail: data.doctor_email,
+            patientName: data.patient_name || data.patientName,
+            patientEmail: data.patient_email || data.patientEmail,
+            doctorEmail: data.doctor_email || data.doctorEmail,
             condition: data.condition,
             risk: data.risk,
             explanation: data.explanation,
             recommendations: data.recommendations || [],
-            createdAt: new Date(data.created_at),
+            createdAt: new Date(data.created_at || data.createdAt || now),
             expiresAt
           });
         }
