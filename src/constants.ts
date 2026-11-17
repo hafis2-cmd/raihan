@@ -8,5 +8,5 @@ export const DISEASE_CATEGORIES = [
   { id: 'Skin Condition', name: 'Skin Condition' },
 ];
 
-export const APP_NAME = 'TeleMed AI';
-export const APP_DESCRIPTION = 'Advanced Diagnosis & Care';
+export const APP_NAME = 'Raihan';
+export const APP_DESCRIPTION = 'Telemedicine & Healthcare System';

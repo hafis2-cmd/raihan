@@ -18,14 +18,27 @@ import {
 } from 'lucide-react';
 
 export default function Login() {
-  const { login, loginWithEmail, signupWithEmail, user, profile, updateRole, loading } = useAuth();
+  const { login, loginAsDemo, isFirebaseConfigured, loginWithEmail, signupWithEmail, user, profile, updateRole, loading } = useAuth();
   const [selectedRole, setSelectedRole] = useState<'Patient' | 'Doctor' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'google'>('google');
+  const [authMode, setAuthMode] = useState<'google' | 'login' | 'signup'>('google');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+
+  const handleDemoAccess = async (role: 'Doctor' | 'Patient' | 'Admin') => {
+    setIsSubmitting(true);
+    setError('');
+    try {
+      await loginAsDemo(role);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Demo login failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleCompleteSetup = async () => {
     setIsSubmitting(true);
@@ -325,6 +338,49 @@ export default function Login() {
                 </div>
               </form>
             )}
+
+            {/* Quick Instant Access for Development & Testing */}
+            <div className="w-full pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Quick Portal Access</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Dev Ready</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDemoAccess('Doctor')}
+                  disabled={isSubmitting}
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all flex flex-col items-center gap-1.5 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Stethoscope className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700">Doctor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDemoAccess('Patient')}
+                  disabled={isSubmitting}
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center gap-1.5 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700">Patient</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDemoAccess('Admin')}
+                  disabled={isSubmitting}
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 transition-all flex flex-col items-center gap-1.5 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700">Admin</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <p className="text-xs text-slate-400 max-w-xs">

@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -27,18 +27,25 @@ const getVal = (envVal: string | undefined, configVal: string | undefined) => {
   return configVal || '';
 };
 
+// Check if a real production API key is configured
+const rawApiKey = getVal(import.meta.env.VITE_FIREBASE_API_KEY, configJson.apiKey);
+export const isFirebaseConfigured = Boolean(rawApiKey && rawApiKey.trim() !== '' && !rawApiKey.startsWith('AIzaSyMock'));
+
+// Provide safe non-empty development key so Firebase client SDK doesn't throw auth/invalid-api-key at module load time
+const activeApiKey = isFirebaseConfigured ? rawApiKey.trim() : 'AIzaSyMockDevKeyForRaihanSystem0000000000';
+
 const firebaseConfig = {
-  apiKey: getVal(import.meta.env.VITE_FIREBASE_API_KEY, configJson.apiKey),
-  authDomain: getVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, configJson.authDomain),
-  projectId: getVal(import.meta.env.VITE_FIREBASE_PROJECT_ID, configJson.projectId),
-  storageBucket: getVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, configJson.storageBucket),
-  messagingSenderId: getVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, configJson.messagingSenderId),
-  appId: getVal(import.meta.env.VITE_FIREBASE_APP_ID, configJson.appId),
+  apiKey: activeApiKey,
+  authDomain: getVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, configJson.authDomain) || 'raihan-telemed.firebaseapp.com',
+  projectId: getVal(import.meta.env.VITE_FIREBASE_PROJECT_ID, configJson.projectId) || 'raihan-telemed',
+  storageBucket: getVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, configJson.storageBucket) || 'raihan-telemed.firebasestorage.app',
+  messagingSenderId: getVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, configJson.messagingSenderId) || '123456789012',
+  appId: getVal(import.meta.env.VITE_FIREBASE_APP_ID, configJson.appId) || '1:123456789012:web:raihan00000000',
   measurementId: getVal(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, configJson.measurementId),
   firestoreDatabaseId: resolvedDatabaseId,
 };
 
-const app = initializeApp(firebaseConfig);
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
@@ -97,11 +104,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 async function testConnection() {
+  if (!isFirebaseConfigured) {
+    console.info("Raihan Telemedicine: Running with development configuration. Real Firebase credentials can be added in .env or firebase-applet-config.json after development.");
+    return;
+  }
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
     if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
+      console.warn("Please check your Firebase configuration or network status.");
     }
   }
 }

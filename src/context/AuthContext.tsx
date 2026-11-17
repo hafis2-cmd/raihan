@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db } from '../firebase';
+import { auth, db, isFirebaseConfigured } from '../firebase';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { ADMIN_EMAIL } from '../constants';
 
-interface UserProfile {
+export interface UserProfile {
   email: string;
   role: 'Patient' | 'Doctor' | 'Admin';
   subscribed: boolean;
@@ -45,7 +45,9 @@ interface AuthContextType {
   user: any | null;
   profile: UserProfile | null;
   loading: boolean;
+  isFirebaseConfigured: boolean;
   login: () => Promise<void>;
+  loginAsDemo: (role: 'Doctor' | 'Patient' | 'Admin') => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signupWithEmail: (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Admin') => Promise<void>;
   logout: () => Promise<void>;
@@ -63,20 +65,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [googleToken, setGoogleToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Safety net: force loading off if it hangs (e.g. offline or restricted network)
+    // 1. Check for persisted demo session
+    const savedUserJson = localStorage.getItem('raihan_active_user');
+    const savedProfileJson = localStorage.getItem('raihan_active_profile');
+    if (savedUserJson && savedProfileJson) {
+      try {
+        const parsedUser = JSON.parse(savedUserJson);
+        const parsedProfile = JSON.parse(savedProfileJson);
+        setUser(parsedUser);
+        setProfile(parsedProfile);
+        setLoading(false);
+        return;
+      } catch (err) {
+        console.warn("Failed to restore saved local session:", err);
+      }
+    }
+
+    // Safety net: force loading off if auth takes more than 1.5 seconds
     const safetyTimeout = setTimeout(() => {
-      console.warn("Auth initialization timed out. Forcing loading off.");
       setLoading(false);
-    }, 3000);
+    }, 1500);
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       clearTimeout(safetyTimeout);
-      setUser(currentUser);
       
       if (currentUser) {
+        setUser(currentUser);
         await fetchProfile(currentUser.uid, currentUser);
       } else {
-        setProfile(null);
+        if (!localStorage.getItem('raihan_active_user')) {
+          setUser(null);
+          setProfile(null);
+        }
         setLoading(false);
       }
     });
@@ -125,7 +145,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
-        await setDoc(userDocRef, newProfile);
+        try {
+          await setDoc(userDocRef, newProfile);
+        } catch (writeErr) {
+          console.warn("Could not write profile to remote Firestore (using local):", writeErr);
+        }
         setProfile({
           ...newProfile,
           createdAt: new Date(),
@@ -133,14 +157,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } as UserProfile);
       }
     } catch (err) {
-      console.error('Profile fetch exception:', err);
-      setProfile(null);
+      console.warn('Profile fetch handled:', err);
+      // Fallback local profile for current user
+      const finalRole = currentUser.email === ADMIN_EMAIL ? 'Admin' : 'Patient';
+      setProfile({
+        email: currentUser.email || 'user@raihan.med',
+        role: finalRole,
+        subscribed: true,
+        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raihan User',
+        createdAt: new Date()
+      } as UserProfile);
     } finally {
       setLoading(false);
     }
   };
 
+  const loginAsDemo = async (role: 'Doctor' | 'Patient' | 'Admin') => {
+    setLoading(true);
+    const email = role === 'Admin' 
+      ? ADMIN_EMAIL 
+      : (role === 'Doctor' ? 'dr.raihan@telemed.com' : 'patient@telemed.com');
+    const name = role === 'Admin' 
+      ? 'System Administrator' 
+      : (role === 'Doctor' ? 'Dr. Raihan (MD)' : 'John Doe');
+
+    const demoUser = {
+      uid: `demo-${role.toLowerCase()}-001`,
+      email,
+      displayName: name,
+    };
+
+    const demoProfile: UserProfile = {
+      email,
+      role,
+      name,
+      subscribed: true,
+      specialty: role === 'Doctor' ? 'General Medicine & Tele-Consultation' : undefined,
+      experience: role === 'Doctor' ? 12 : undefined,
+      bio: role === 'Doctor' ? 'Chief Medical Officer at Raihan Telemedicine Clinic.' : undefined,
+      location: 'Raihan Central Hospital',
+      isOnline: true,
+      age: role === 'Patient' ? 29 : 42,
+      gender: 'Male',
+      bloodGroup: 'O+',
+      allergies: 'None',
+      medicalHistory: 'Regular clinical follow-ups. Good health profile.',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    localStorage.setItem('raihan_active_user', JSON.stringify(demoUser));
+    localStorage.setItem('raihan_active_profile', JSON.stringify(demoProfile));
+    setUser(demoUser);
+    setProfile(demoProfile);
+    setLoading(false);
+  };
+
   const login = async () => {
+    if (!isFirebaseConfigured) {
+      await loginAsDemo('Doctor');
+      return;
+    }
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -164,10 +241,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
+    if (!isFirebaseConfigured) {
+      const role = email === ADMIN_EMAIL ? 'Admin' : (email.toLowerCase().includes('doc') ? 'Doctor' : 'Patient');
+      await loginAsDemo(role);
+      return;
+    }
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const signupWithEmail = async (email: string, pass: string, name: string, role: 'Patient' | 'Doctor' | 'Admin') => {
+    if (!isFirebaseConfigured) {
+      setLoading(true);
+      const finalRole = email === ADMIN_EMAIL ? 'Admin' : role;
+      const demoUser = {
+        uid: `demo-${Date.now()}`,
+        email,
+        displayName: name,
+      };
+      const demoProfile: UserProfile = {
+        email,
+        role: finalRole,
+        name,
+        subscribed: email === ADMIN_EMAIL,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      localStorage.setItem('raihan_active_user', JSON.stringify(demoUser));
+      localStorage.setItem('raihan_active_profile', JSON.stringify(demoProfile));
+      setUser(demoUser);
+      setProfile(demoProfile);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -207,48 +313,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await signOut(auth);
+    localStorage.removeItem('raihan_active_user');
+    localStorage.removeItem('raihan_active_profile');
+    try {
+      await signOut(auth);
+    } catch (e) {
+      // Ignore in demo mode
+    }
+    setUser(null);
+    setProfile(null);
     setGoogleToken(null);
   };
 
   const updateRole = async (role: 'Patient' | 'Doctor' | 'Admin') => {
-    if (!auth.currentUser) return;
+    if (!user) return;
     setLoading(true);
+    const finalRole = user.email === ADMIN_EMAIL ? 'Admin' : role;
     
-    try {
-      const finalRole = auth.currentUser.email === ADMIN_EMAIL ? 'Admin' : role;
-      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+    const updatedProfile: UserProfile = profile ? {
+      ...profile,
+      role: finalRole as any,
+      updatedAt: new Date()
+    } : {
+      email: user.email || '',
+      role: finalRole as any,
+      subscribed: user.email === ADMIN_EMAIL,
+      name: user.displayName || '',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-      await setDoc(userDocRef, {
-        email: auth.currentUser.email || '',
-        role: finalRole,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || '',
-        subscribed: auth.currentUser.email === ADMIN_EMAIL,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+    localStorage.setItem('raihan_active_profile', JSON.stringify(updatedProfile));
+    setProfile(updatedProfile);
 
-      setProfile((prev) => prev ? {
-        ...prev,
-        role: finalRole as any,
-        updatedAt: new Date()
-      } : {
-        email: auth.currentUser?.email || '',
-        role: finalRole as any,
-        subscribed: auth.currentUser?.email === ADMIN_EMAIL,
-        name: auth.currentUser?.displayName || '',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-    } catch (error) {
-      console.error("Role update failed:", error);
-      throw error;
-    } finally {
-      setLoading(false);
+    if (isFirebaseConfigured && auth.currentUser) {
+      try {
+        const userDocRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(userDocRef, {
+          email: auth.currentUser.email || '',
+          role: finalRole,
+          name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || '',
+          subscribed: auth.currentUser.email === ADMIN_EMAIL,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (error) {
+        console.error("Role update failed:", error);
+      }
     }
+
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, loginWithEmail, signupWithEmail, logout, updateRole, googleToken, connectGoogleCalendar }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      loading, 
+      isFirebaseConfigured,
+      login, 
+      loginAsDemo,
+      loginWithEmail, 
+      signupWithEmail, 
+      logout, 
+      updateRole, 
+      googleToken, 
+      connectGoogleCalendar 
+    }}>
       {children}
     </AuthContext.Provider>
   );
