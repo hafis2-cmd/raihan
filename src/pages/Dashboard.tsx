@@ -25,6 +25,11 @@ import {
   getLocalConsultations, 
   getLocalPrescriptions 
 } from '../services/dentalService';
+import {
+  ConsultationInvoice,
+  fetchInvoices,
+  getLocalInvoices
+} from '../services/billingService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -40,6 +45,7 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [consultations, setConsultations] = useState<DentalConsultation[]>([]);
   const [prescriptions, setPrescriptions] = useState<DentalPrescription[]>([]);
+  const [invoices, setInvoices] = useState<ConsultationInvoice[]>([]);
   const [, setNotifications] = useState<SystemNotification[]>([]);
   const [todayStr] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -47,6 +53,7 @@ export default function Dashboard() {
     const allAppts = getLocalAppointments();
     const allConsultations = getLocalConsultations();
     const allPrescriptions = getLocalPrescriptions();
+    const allInvoices = getLocalInvoices();
     
     if (profile?.email) {
       const emailLower = profile.email.toLowerCase().trim();
@@ -54,12 +61,25 @@ export default function Dashboard() {
         setAppointments(allAppts.filter(a => (a.doctor_email || '').toLowerCase().trim() === emailLower));
         setConsultations(allConsultations.filter(c => (c.dentist_email || '').toLowerCase().trim() === emailLower));
         setPrescriptions(allPrescriptions.filter(p => (p.dentist_email || '').toLowerCase().trim() === emailLower));
+        setInvoices(allInvoices);
       } else {
         setAppointments(allAppts.filter(a => (a.patient_email || '').toLowerCase().trim() === emailLower));
         setConsultations(allConsultations.filter(c => (c.patient_email || '').toLowerCase().trim() === emailLower));
         setPrescriptions(allPrescriptions.filter(p => (p.patient_email || '').toLowerCase().trim() === emailLower));
+        setInvoices(allInvoices.filter(i => (i.patientEmail || '').toLowerCase().trim() === emailLower));
       }
       setNotifications(getLocalNotifications(profile.email));
+
+      // Asynchronously sync from server
+      fetchInvoices(profile.email, undefined).then(serverInvs => {
+        if (serverInvs && serverInvs.length >= 0) {
+          if (isDentist) {
+            setInvoices(serverInvs);
+          } else {
+            setInvoices(serverInvs.filter(i => (i.patientEmail || '').toLowerCase().trim() === emailLower));
+          }
+        }
+      }).catch(() => {});
     }
   };
 
@@ -70,12 +90,16 @@ export default function Dashboard() {
     window.addEventListener('raihan_consultations_updated', handleUpdate);
     window.addEventListener('raihan_prescriptions_updated', handleUpdate);
     window.addEventListener('raihan_notification_updated', handleUpdate);
+    window.addEventListener('raihan_invoices_updated', handleUpdate);
+    window.addEventListener('raihan_payments_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
     return () => {
       window.removeEventListener('raihan_appointments_updated', handleUpdate);
       window.removeEventListener('raihan_consultations_updated', handleUpdate);
       window.removeEventListener('raihan_prescriptions_updated', handleUpdate);
       window.removeEventListener('raihan_notification_updated', handleUpdate);
+      window.removeEventListener('raihan_invoices_updated', handleUpdate);
+      window.removeEventListener('raihan_payments_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
   }, [profile?.email, isDentist]);
@@ -87,6 +111,7 @@ export default function Dashboard() {
   const uniquePatientEmails = new Set(appointments.map(a => a.patient_email).filter(Boolean));
   consultations.forEach(c => { if (c.patient_email) uniquePatientEmails.add(c.patient_email); });
   const totalRegisteredPatients = uniquePatientEmails.size;
+  const pendingVerificationInvoices = invoices.filter(i => i.status === 'PENDING_VERIFICATION');
 
   // Patient metrics
   const patientUpcoming = appointments.filter(a => a.status === 'ACCEPTED' && a.appointment_date >= todayStr);
@@ -94,6 +119,8 @@ export default function Dashboard() {
   const patientRxCount = prescriptions.length;
   const patientRecordCount = consultations.length;
   const nextConfirmedAppointment = patientUpcoming[0];
+  const patientPendingInvoices = invoices.filter(i => i.status === 'PENDING' || i.status === 'REJECTED');
+  const patientSubmittedInvoices = invoices.filter(i => i.status === 'PENDING_VERIFICATION');
 
   const displayName = profile?.name || (isDentist ? 'Dr. Raihan' : 'Patient');
 
@@ -189,6 +216,36 @@ export default function Dashboard() {
       {/* ========================================================== */}
       {isDentist ? (
         <div className="space-y-6">
+
+          {/* Action Required: Payment Submissions Awaiting Clinical Verification */}
+          {pendingVerificationInvoices.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-300 dark:border-amber-700/60 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white uppercase tracking-wider">
+                      Action Required
+                    </span>
+                    <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                      {pendingVerificationInvoices.length} Payment Submission{pendingVerificationInvoices.length > 1 ? 's' : ''} Awaiting Clinical Verification
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800 dark:text-amber-300">
+                    Patients have submitted PhonePe UPI payment references that require confirmation against clinic bank records before issuing official receipts.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/payments"
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-colors shrink-0 shadow-xs text-center"
+              >
+                Review & Verify Payments
+              </Link>
+            </div>
+          )}
           
           {/* Key Metrics Stats Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -249,7 +306,7 @@ export default function Dashboard() {
                 { label: 'My Patients', icon: Users, path: '/patients', color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' },
                 { label: 'Consultations', icon: Stethoscope, path: '/consultations', color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40' },
                 { label: 'Prescriptions', icon: FileText, path: '/prescriptions', color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40' },
-                { label: 'Payments', icon: CreditCard, path: '/payments', color: 'text-slate-600 bg-slate-100 dark:bg-slate-800' },
+                { label: 'Payments', icon: CreditCard, path: '/payments', color: 'text-slate-600 bg-slate-100 dark:bg-slate-800', badge: pendingVerificationInvoices.length },
               ].map((item, idx) => (
                 <Link
                   key={idx}
@@ -364,6 +421,66 @@ export default function Dashboard() {
         /* PATIENT DASHBOARD VIEW                                     */
         /* ========================================================== */
         <div className="space-y-6">
+
+          {/* Patient Action Required: Consultation Fee Due Banner */}
+          {patientPendingInvoices.length > 0 && (
+            <div className="bg-emerald-500/10 border border-emerald-300 dark:border-emerald-700/60 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider">
+                      Payment Due
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-950 dark:text-emerald-200">
+                      Consultation Fee Assigned (₹{patientPendingInvoices.reduce((sum, inv) => sum + inv.amount, 0).toFixed(2)})
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                    Dr. Raihan has assigned a consultation fee for your visit. Scan our official PhonePe static UPI QR code and submit your 12-digit UTR to complete your billing.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/payments"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors shrink-0 shadow-xs text-center"
+              >
+                Pay via PhonePe QR
+              </Link>
+            </div>
+          )}
+
+          {/* Patient Information: Payment Verification in Progress Banner */}
+          {patientPendingInvoices.length === 0 && patientSubmittedInvoices.length > 0 && (
+            <div className="bg-blue-500/10 border border-blue-300 dark:border-blue-700/60 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white uppercase tracking-wider">
+                      Awaiting Verification
+                    </span>
+                    <span className="text-xs font-semibold text-blue-950 dark:text-blue-200">
+                      Payment Under Clinical Review (₹{patientSubmittedInvoices[0].amount.toFixed(2)})
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-800 dark:text-blue-300">
+                    Your UPI transaction reference has been submitted. Dr. Raihan will verify and issue your official receipt shortly.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/payments"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shrink-0 shadow-xs text-center"
+              >
+                View Billing Status
+              </Link>
+            </div>
+          )}
           
           {/* Next Confirmed Dental Appointment Banner */}
           {nextConfirmedAppointment && (
@@ -449,7 +566,7 @@ export default function Dashboard() {
                 { label: 'Book Appointment', icon: CalendarPlus, path: '/appointments', color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
                 { label: 'Dental Records', icon: Stethoscope, path: '/consultations', color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40', badge: consultations.length },
                 { label: 'Prescriptions', icon: FileText, path: '/prescriptions', color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40', badge: prescriptions.length },
-                { label: 'Invoices & Billing', icon: CreditCard, path: '/payments', color: 'text-slate-600 bg-slate-100 dark:bg-slate-800' },
+                { label: 'Invoices & Billing', icon: CreditCard, path: '/payments', color: 'text-slate-600 bg-slate-100 dark:bg-slate-800', badge: patientPendingInvoices.length },
               ].map((item, idx) => (
                 <Link
                   key={idx}

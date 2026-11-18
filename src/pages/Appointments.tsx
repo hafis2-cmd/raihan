@@ -889,6 +889,15 @@ export default function Appointments() {
 
                         <div className="flex items-center gap-2">
                           <button
+                            onClick={() => navigate('/payments', { state: { patientEmail: appt.patient_email, patientName: appt.patient_name, appointmentId: appt.id, openAssign: true } })}
+                            className="px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                            title="Assign Consultation Fee / Bill Patient"
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Bill Patient</span>
+                          </button>
+
+                          <button
                             onClick={() => navigate('/prescriptions', { state: { patientEmail: appt.patient_email, patientName: appt.patient_name } })}
                             className="px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
                             title="Write Prescription"
@@ -1454,9 +1463,9 @@ export default function Appointments() {
                           </button>
 
                           <button
-                            onClick={() => navigate('/payments', { state: { appointmentId: appt.id, doctorName: appt.doctor_name, amount: 50 } })}
+                            onClick={() => navigate('/payments', { state: { appointmentId: appt.id } })}
                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-amber-600 rounded-lg transition-colors"
-                            title="View / Pay Invoice"
+                            title="View / Pay Consultation Invoice"
                           >
                             <CreditCard className="w-4 h-4" />
                           </button>

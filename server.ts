@@ -112,10 +112,14 @@ async function startServer() {
 
   app.use(express.json({ limit: "10mb" })); // Request size limits (Phase 4 API protection)
 
-  // Persistent Uploads Directory for Profile Photos
+  // Persistent Uploads Directory for Profile Photos and Payment Screenshots
   const UPLOADS_DIR = path.join(process.cwd(), "uploads", "avatars");
   if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  const UPLOADS_PAYMENTS_DIR = path.join(process.cwd(), "uploads", "payments");
+  if (!fs.existsSync(UPLOADS_PAYMENTS_DIR)) {
+    fs.mkdirSync(UPLOADS_PAYMENTS_DIR, { recursive: true });
   }
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
@@ -823,6 +827,689 @@ async function startServer() {
       });
     } catch (err: any) {
       return res.status(500).json({ error: "Failed to retrieve photo: " + err.message });
+    }
+  });
+
+  // =========================================================================
+  // DENTIST-CONTROLLED CONSULTATION BILLING & STATIC UPI QR PAYMENT SUBSYSTEM
+  // =========================================================================
+  const INVOICES_FILE = path.join(process.cwd(), "raihan-server-invoices.json");
+
+  interface ServerAuditEntry {
+    action: 'CREATED' | 'AMOUNT_MODIFIED' | 'SUBMISSION_RECEIVED' | 'VERIFIED' | 'REJECTED' | 'REVOKED';
+    performedBy: string;
+    performedByName: string;
+    timestamp: string;
+    previousAmount?: number;
+    newAmount?: number;
+    notes?: string;
+  }
+
+  interface ServerPaymentSubmission {
+    id: string;
+    invoiceId: string;
+    invoiceNumber: string;
+    patientEmail: string;
+    patientName: string;
+    amount: number;
+    currency: 'INR';
+    transactionReference: string;
+    paymentDate: string;
+    paymentApp: 'PhonePe' | 'Google Pay' | 'Paytm' | 'BHIM' | 'Other';
+    screenshotUrl?: string;
+    status: 'SUBMITTED' | 'VERIFIED' | 'REJECTED';
+    submittedAt: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+    reviewedByName?: string;
+    rejectionReason?: string;
+  }
+
+  interface ServerReceipt {
+    receiptNumber: string;
+    invoiceId: string;
+    invoiceNumber: string;
+    patientEmail: string;
+    patientName: string;
+    dentistEmail: string;
+    dentistName: string;
+    amount: number;
+    currency: 'INR';
+    paymentMethod: 'UPI';
+    upiId: string;
+    transactionReference: string;
+    paymentDate: string;
+    verificationDate: string;
+    verifiedBy: string;
+    verifiedByName: string;
+    status: 'VERIFIED';
+    consultationDetails: string;
+  }
+
+  interface ServerInvoice {
+    id: string;
+    invoiceNumber: string;
+    dentistEmail: string;
+    dentistName: string;
+    patientEmail: string;
+    patientName: string;
+    patientPhone?: string;
+    appointmentId?: string;
+    consultationId?: string;
+    description: string;
+    amount: number;
+    currency: 'INR';
+    dueDate?: string;
+    status: 'PENDING' | 'PENDING_VERIFICATION' | 'PAID' | 'REJECTED' | 'REVOKED' | 'REFUNDED';
+    createdAt: string;
+    updatedAt: string;
+    revokedAt?: string;
+    revocationReason?: string;
+    auditHistory: ServerAuditEntry[];
+    submissions: ServerPaymentSubmission[];
+    receipt?: ServerReceipt;
+  }
+
+  function loadServerInvoices(): ServerInvoice[] {
+    try {
+      if (fs.existsSync(INVOICES_FILE)) {
+        const raw = fs.readFileSync(INVOICES_FILE, "utf-8");
+        return JSON.parse(raw);
+      }
+      return [];
+    } catch (err) {
+      console.error("Failed to load server invoices:", err);
+      return [];
+    }
+  }
+
+  function saveServerInvoices(invoices: ServerInvoice[]): void {
+    try {
+      fs.writeFileSync(INVOICES_FILE, JSON.stringify(invoices, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Failed to save server invoices:", err);
+    }
+  }
+
+  function generateInvoiceNumber(invoices: ServerInvoice[]): string {
+    const year = new Date().getFullYear();
+    const count = invoices.length + 1;
+    return `RDC-INV-${year}-${String(count).padStart(3, '0')}`;
+  }
+
+  function generateReceiptNumber(invoices: ServerInvoice[]): string {
+    const year = new Date().getFullYear();
+    const paidCount = invoices.filter(i => i.receipt).length + 1;
+    return `RDC-REC-${year}-${String(paidCount).padStart(3, '0')}`;
+  }
+
+  /**
+   * 1. Get Invoices
+   * Dentists get all clinic invoices (or filter by patient). Patients get only their own assigned invoices.
+   */
+  app.get("/api/billing/invoices", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized. Please sign in." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+
+      const invoices = loadServerInvoices();
+      if (isDentist) {
+        const targetPatient = req.query.patientEmail ? String(req.query.patientEmail).toLowerCase().trim() : null;
+        if (targetPatient) {
+          const filtered = invoices.filter(i => i.patientEmail.toLowerCase() === targetPatient);
+          return res.json({ success: true, count: filtered.length, invoices: filtered });
+        }
+        return res.json({ success: true, count: invoices.length, invoices });
+      } else {
+        const patientInvoices = invoices.filter(i => i.patientEmail.toLowerCase() === userEmail.toLowerCase());
+        return res.json({ success: true, count: patientInvoices.length, invoices: patientInvoices });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to load invoices: " + err.message });
+    }
+  });
+
+  /**
+   * 2. Dentist Assigns Consultation Fee
+   * Creates a mandatory consultation fee invoice in INR.
+   */
+  app.post("/api/billing/invoices", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      if (!isDentist) {
+        return res.status(403).json({ error: "Forbidden: Only authorized dentists can assign consultation fees." });
+      }
+
+      const { patientEmail, patientName, patientPhone, amount, description, appointmentId, consultationId, dueDate } = req.body;
+      if (!patientEmail || !description || amount === undefined) {
+        return res.status(400).json({ error: "Patient email, description, and fee amount are required." });
+      }
+
+      const numAmount = Number(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        return res.status(400).json({ error: "Consultation fee must be a valid positive amount in INR (₹)." });
+      }
+
+      const invoices = loadServerInvoices();
+      const invoiceNumber = generateInvoiceNumber(invoices);
+      const newInvoice: ServerInvoice = {
+        id: `inv-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+        invoiceNumber,
+        dentistEmail: currentUser?.email || userEmail,
+        dentistName: currentUser?.name || "Dr. Raihan",
+        patientEmail: String(patientEmail).toLowerCase().trim(),
+        patientName: String(patientName || patientEmail).trim(),
+        patientPhone: patientPhone ? String(patientPhone).trim() : undefined,
+        appointmentId: appointmentId || undefined,
+        consultationId: consultationId || undefined,
+        description: String(description).trim(),
+        amount: numAmount,
+        currency: "INR",
+        dueDate: dueDate || undefined,
+        status: "PENDING",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        auditHistory: [
+          {
+            action: "CREATED",
+            performedBy: currentUser?.email || userEmail,
+            performedByName: currentUser?.name || "Dr. Raihan",
+            timestamp: new Date().toISOString(),
+            newAmount: numAmount,
+            notes: `Assigned consultation fee of ₹${numAmount.toFixed(2)} (${String(description).trim()})`
+          }
+        ],
+        submissions: []
+      };
+
+      invoices.unshift(newInvoice);
+      saveServerInvoices(invoices);
+
+      return res.status(201).json({
+        success: true,
+        message: `Consultation fee of ₹${numAmount.toFixed(2)} successfully assigned under ${invoiceNumber}`,
+        invoice: newInvoice
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to create invoice: " + err.message });
+    }
+  });
+
+  /**
+   * 3. Dentist Modifies Unpaid Consultation Fee
+   * Updates amount, preserves previous amount in audit history, updates patient view.
+   */
+  app.put("/api/billing/invoices/:id", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      if (!isDentist) {
+        return res.status(403).json({ error: "Forbidden: Only authorized dentists can modify consultation fees." });
+      }
+
+      const { id } = req.params;
+      const invoices = loadServerInvoices();
+      const invoice = invoices.find(i => i.id === id || i.invoiceNumber === id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found." });
+      }
+
+      if (invoice.status === "PAID") {
+        return res.status(400).json({ error: "Cannot modify completed paid invoices. Verified receipts are immutable." });
+      }
+
+      if (invoice.status === "REVOKED") {
+        return res.status(400).json({ error: "Cannot modify revoked invoices. Please create a new invoice." });
+      }
+
+      const { amount, description, dueDate, notes } = req.body;
+      const previousAmount = invoice.amount;
+      let amountChanged = false;
+
+      if (amount !== undefined) {
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount <= 0) {
+          return res.status(400).json({ error: "Consultation fee must be a valid positive amount in INR (₹)." });
+        }
+        if (numAmount !== previousAmount) {
+          invoice.amount = numAmount;
+          amountChanged = true;
+        }
+      }
+
+      if (description) {
+        invoice.description = String(description).trim();
+      }
+      if (dueDate !== undefined) {
+        invoice.dueDate = dueDate || undefined;
+      }
+
+      if (invoice.status === "REJECTED") {
+        invoice.status = "PENDING";
+      }
+
+      invoice.updatedAt = new Date().toISOString();
+      invoice.auditHistory.push({
+        action: "AMOUNT_MODIFIED",
+        performedBy: currentUser?.email || userEmail,
+        performedByName: currentUser?.name || "Dr. Raihan",
+        timestamp: new Date().toISOString(),
+        previousAmount,
+        newAmount: invoice.amount,
+        notes: notes || (amountChanged 
+          ? `Consultation fee revised from ₹${previousAmount.toFixed(2)} to ₹${invoice.amount.toFixed(2)}` 
+          : "Invoice details updated by attending dentist")
+      });
+
+      saveServerInvoices(invoices);
+
+      return res.json({
+        success: true,
+        message: "Invoice successfully updated.",
+        invoice
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to update invoice: " + err.message });
+    }
+  });
+
+  /**
+   * 4. Dentist Revokes Unpaid Invoice
+   * Marks as REVOKED, prevents new submissions, preserves audit history.
+   */
+  app.post("/api/billing/invoices/:id/revoke", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      if (!isDentist) {
+        return res.status(403).json({ error: "Forbidden: Only authorized dentists can revoke invoices." });
+      }
+
+      const { id } = req.params;
+      const { reason } = req.body;
+      const invoices = loadServerInvoices();
+      const invoice = invoices.find(i => i.id === id || i.invoiceNumber === id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found." });
+      }
+
+      if (invoice.status === "PAID") {
+        return res.status(400).json({ error: "Completed paid invoices cannot be revoked." });
+      }
+
+      invoice.status = "REVOKED";
+      invoice.revokedAt = new Date().toISOString();
+      invoice.revocationReason = reason ? String(reason).trim() : "Revoked by attending dentist";
+      invoice.updatedAt = new Date().toISOString();
+      invoice.auditHistory.push({
+        action: "REVOKED",
+        performedBy: currentUser?.email || userEmail,
+        performedByName: currentUser?.name || "Dr. Raihan",
+        timestamp: new Date().toISOString(),
+        notes: invoice.revocationReason
+      });
+
+      saveServerInvoices(invoices);
+
+      return res.json({
+        success: true,
+        message: `Invoice ${invoice.invoiceNumber} has been revoked.`,
+        invoice
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to revoke invoice: " + err.message });
+    }
+  });
+
+  /**
+   * 5. Patient Submits UPI Transaction Reference (UTR)
+   * Records payment submission; sets status to PENDING_VERIFICATION.
+   * Server strictly enforces assigned amount from invoice (patient cannot alter amount).
+   */
+  app.post("/api/billing/invoices/:id/submit-payment", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized. Please sign in to submit payment." });
+      }
+
+      const { id } = req.params;
+      const invoices = loadServerInvoices();
+      const invoice = invoices.find(i => i.id === id || i.invoiceNumber === id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found." });
+      }
+
+      if (invoice.status === "PAID") {
+        return res.status(400).json({ error: "This invoice has already been verified and paid." });
+      }
+
+      if (invoice.status === "REVOKED") {
+        return res.status(400).json({ error: "This invoice has been revoked and cannot accept payment submissions." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      
+      // Patient ownership check
+      if (!isDentist && invoice.patientEmail.toLowerCase() !== userEmail.toLowerCase()) {
+        return res.status(403).json({ error: "Forbidden: You can only submit payments for your own invoices." });
+      }
+
+      const { transactionReference, paymentDate, paymentApp, screenshot } = req.body;
+      if (!transactionReference || String(transactionReference).trim().length < 6) {
+        return res.status(400).json({ error: "A valid 12-digit UPI Transaction ID / UTR reference number is mandatory." });
+      }
+
+      const cleanUtr = String(transactionReference).trim().toUpperCase();
+
+      // Check for duplicate verified UTRs across other invoices
+      const isDuplicateVerified = invoices.some(inv => 
+        inv.id !== invoice.id && 
+        inv.status === "PAID" && 
+        inv.submissions.some(s => s.status === "VERIFIED" && s.transactionReference === cleanUtr)
+      );
+      if (isDuplicateVerified) {
+        return res.status(400).json({ error: "This UPI transaction reference has already been verified for another clinic invoice. Please enter the authentic UTR from your UPI payment." });
+      }
+
+      // Optional screenshot handling
+      let screenshotUrl: string | undefined = undefined;
+      if (screenshot && typeof screenshot === "string" && screenshot.startsWith("data:image/")) {
+        const match = screenshot.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+        if (match) {
+          const ext = match[1] === "jpeg" ? "jpg" : match[1];
+          const buffer = Buffer.from(match[2], "base64");
+          if (buffer.length <= 5 * 1024 * 1024) {
+            const fileName = `pay_${Date.now()}_${crypto.randomBytes(3).toString("hex")}.${ext}`;
+            const targetPath = path.join(process.cwd(), "uploads", "payments", fileName);
+            fs.writeFileSync(targetPath, buffer);
+            screenshotUrl = `/uploads/payments/${fileName}`;
+          }
+        }
+      }
+
+      const validApps = ['PhonePe', 'Google Pay', 'Paytm', 'BHIM', 'Other'];
+      const chosenApp = validApps.includes(paymentApp) ? paymentApp : 'PhonePe';
+
+      const submission: ServerPaymentSubmission = {
+        id: `sub-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        patientEmail: invoice.patientEmail,
+        patientName: invoice.patientName,
+        amount: invoice.amount, // Enforced from server invoice
+        currency: "INR",
+        transactionReference: cleanUtr,
+        paymentDate: paymentDate ? String(paymentDate).trim() : new Date().toISOString().split("T")[0],
+        paymentApp: chosenApp,
+        screenshotUrl,
+        status: "SUBMITTED",
+        submittedAt: new Date().toISOString()
+      };
+
+      invoice.submissions.unshift(submission);
+      invoice.status = "PENDING_VERIFICATION";
+      invoice.updatedAt = new Date().toISOString();
+      invoice.auditHistory.push({
+        action: "SUBMISSION_RECEIVED",
+        performedBy: userEmail,
+        performedByName: currentUser?.name || invoice.patientName,
+        timestamp: new Date().toISOString(),
+        notes: `Submitted UPI payment details (${chosenApp}, UTR: ${cleanUtr}). Awaiting dentist verification.`
+      });
+
+      saveServerInvoices(invoices);
+
+      return res.status(201).json({
+        success: true,
+        message: "Payment reference submitted successfully. Your payment is currently awaiting clinical verification by Dr. Raihan.",
+        invoice,
+        submission
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to submit payment details: " + err.message });
+    }
+  });
+
+  /**
+   * 6. Dentist Verifies Payment Against Receiving Account
+   * Verifies UTR, marks invoice as PAID, issues official clinical receipt.
+   */
+  app.post("/api/billing/invoices/:id/verify-payment", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      if (!isDentist) {
+        return res.status(403).json({ error: "Forbidden: Only authorized dentists can verify payments against the clinic receiving account." });
+      }
+
+      const { id } = req.params;
+      const { submissionId, notes } = req.body;
+      const invoices = loadServerInvoices();
+      const invoice = invoices.find(i => i.id === id || i.invoiceNumber === id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found." });
+      }
+
+      if (invoice.status === "PAID") {
+        return res.status(400).json({ error: "Invoice has already been verified and paid." });
+      }
+
+      if (invoice.status === "REVOKED") {
+        return res.status(400).json({ error: "Cannot verify payments for a revoked invoice." });
+      }
+
+      let submission: ServerPaymentSubmission | undefined;
+      if (submissionId) {
+        submission = invoice.submissions.find(s => s.id === submissionId);
+      } else {
+        submission = invoice.submissions.find(s => s.status === "SUBMITTED") || invoice.submissions[0];
+      }
+
+      if (!submission) {
+        return res.status(400).json({ error: "No payment submission found on this invoice to verify." });
+      }
+
+      submission.status = "VERIFIED";
+      submission.reviewedAt = new Date().toISOString();
+      submission.reviewedBy = currentUser?.email || userEmail;
+      submission.reviewedByName = currentUser?.name || "Dr. Raihan";
+
+      const receiptNumber = generateReceiptNumber(invoices);
+      const receipt: ServerReceipt = {
+        receiptNumber,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        patientEmail: invoice.patientEmail,
+        patientName: invoice.patientName,
+        dentistEmail: invoice.dentistEmail,
+        dentistName: invoice.dentistName,
+        amount: invoice.amount,
+        currency: "INR",
+        paymentMethod: "UPI",
+        upiId: "Q288159952@ybl",
+        transactionReference: submission.transactionReference,
+        paymentDate: submission.paymentDate,
+        verificationDate: new Date().toISOString(),
+        verifiedBy: currentUser?.email || userEmail,
+        verifiedByName: currentUser?.name || "Dr. Raihan",
+        status: "VERIFIED",
+        consultationDetails: invoice.description
+      };
+
+      invoice.receipt = receipt;
+      invoice.status = "PAID";
+      invoice.updatedAt = new Date().toISOString();
+      invoice.auditHistory.push({
+        action: "VERIFIED",
+        performedBy: currentUser?.email || userEmail,
+        performedByName: currentUser?.name || "Dr. Raihan",
+        timestamp: new Date().toISOString(),
+        notes: notes ? String(notes).trim() : `Payment of ₹${invoice.amount.toFixed(2)} verified against clinic PhonePe receiving account (UTR: ${submission.transactionReference})`
+      });
+
+      saveServerInvoices(invoices);
+
+      return res.json({
+        success: true,
+        message: `Payment verified. Official Clinical Receipt ${receiptNumber} generated.`,
+        invoice,
+        receipt
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to verify payment: " + err.message });
+    }
+  });
+
+  /**
+   * 7. Dentist Rejects Unverifiable Payment Submission
+   * Requires rejection reason; preserves submission history; keeps invoice open for resubmission.
+   */
+  app.post("/api/billing/invoices/:id/reject-payment", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      if (!isDentist) {
+        return res.status(403).json({ error: "Forbidden: Only authorized dentists can review payments." });
+      }
+
+      const { id } = req.params;
+      const { submissionId, reason } = req.body;
+      if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ error: "A rejection reason is mandatory to guide the patient." });
+      }
+
+      const invoices = loadServerInvoices();
+      const invoice = invoices.find(i => i.id === id || i.invoiceNumber === id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found." });
+      }
+
+      let submission: ServerPaymentSubmission | undefined;
+      if (submissionId) {
+        submission = invoice.submissions.find(s => s.id === submissionId);
+      } else {
+        submission = invoice.submissions.find(s => s.status === "SUBMITTED") || invoice.submissions[0];
+      }
+
+      if (!submission) {
+        return res.status(400).json({ error: "No submission found on this invoice to reject." });
+      }
+
+      submission.status = "REJECTED";
+      submission.rejectionReason = String(reason).trim();
+      submission.reviewedAt = new Date().toISOString();
+      submission.reviewedBy = currentUser?.email || userEmail;
+      submission.reviewedByName = currentUser?.name || "Dr. Raihan";
+
+      invoice.status = "REJECTED";
+      invoice.updatedAt = new Date().toISOString();
+      invoice.auditHistory.push({
+        action: "REJECTED",
+        performedBy: currentUser?.email || userEmail,
+        performedByName: currentUser?.name || "Dr. Raihan",
+        timestamp: new Date().toISOString(),
+        notes: `Payment submission rejected: ${String(reason).trim()}`
+      });
+
+      saveServerInvoices(invoices);
+
+      return res.json({
+        success: true,
+        message: "Submission rejected. Patient may re-verify their UTR and resubmit.",
+        invoice
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to reject payment: " + err.message });
+    }
+  });
+
+  /**
+   * 8. Dentist Billing Statistics
+   */
+  app.get("/api/billing/stats", (req, res) => {
+    try {
+      const userEmail = resolveUserEmail(req);
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      const users = loadServerUsers();
+      const currentUser = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const isDentist = currentUser?.role === "Dentist" || currentUser?.role === "Doctor" || currentUser?.role === "Admin";
+      if (!isDentist) {
+        return res.status(403).json({ error: "Forbidden: Clinical stats restricted to dentists." });
+      }
+
+      const invoices = loadServerInvoices();
+      const totalVerifiedRevenue = invoices
+        .filter(i => i.status === "PAID")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      const awaitingVerificationCount = invoices.filter(i => i.status === "PENDING_VERIFICATION").length;
+      const awaitingVerificationAmount = invoices
+        .filter(i => i.status === "PENDING_VERIFICATION")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      const pendingInvoicesCount = invoices.filter(i => i.status === "PENDING" || i.status === "REJECTED").length;
+      const pendingInvoicesAmount = invoices
+        .filter(i => i.status === "PENDING" || i.status === "REJECTED")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      return res.json({
+        success: true,
+        stats: {
+          totalVerifiedRevenue,
+          awaitingVerificationCount,
+          awaitingVerificationAmount,
+          pendingInvoicesCount,
+          pendingInvoicesAmount,
+          totalInvoicesCount: invoices.length,
+          paidInvoicesCount: invoices.filter(i => i.status === "PAID").length,
+          revokedInvoicesCount: invoices.filter(i => i.status === "REVOKED").length
+        }
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to compute billing stats: " + err.message });
     }
   });
 

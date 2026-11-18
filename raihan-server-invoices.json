@@ -1,0 +1,81 @@
+[
+  {
+    "id": "inv-1794981852444-f9432f",
+    "invoiceNumber": "RDC-INV-2026-001",
+    "dentistEmail": "doctor@clinic.com",
+    "dentistName": "Dr. Raihan",
+    "patientEmail": "hafismohammed73@gmail.com",
+    "patientName": "Hafis Mohammed K",
+    "patientPhone": "+91 9876543210",
+    "description": "Root Canal Treatment (RCT) - Biomechanical Preparation",
+    "amount": 650,
+    "currency": "INR",
+    "dueDate": "2026-11-25",
+    "status": "PAID",
+    "createdAt": "2026-11-18T06:04:12.444Z",
+    "updatedAt": "2026-11-18T06:04:12.461Z",
+    "auditHistory": [
+      {
+        "action": "CREATED",
+        "performedBy": "doctor@clinic.com",
+        "performedByName": "Dr. Raihan",
+        "timestamp": "2026-11-18T06:04:12.444Z",
+        "newAmount": 650,
+        "notes": "Assigned consultation fee of ₹650.00 (Root Canal Treatment (RCT) - Biomechanical Preparation)"
+      },
+      {
+        "action": "SUBMISSION_RECEIVED",
+        "performedBy": "hafismohammed73@gmail.com",
+        "performedByName": "Hafis Mohammed K",
+        "timestamp": "2026-11-18T06:04:12.453Z",
+        "notes": "Submitted UPI payment details (PhonePe, UTR: 123456789012). Awaiting dentist verification."
+      },
+      {
+        "action": "VERIFIED",
+        "performedBy": "doctor@clinic.com",
+        "performedByName": "Dr. Raihan",
+        "timestamp": "2026-11-18T06:04:12.461Z",
+        "notes": "Payment verified and matched against clinic PhonePe receiving statement"
+      }
+    ],
+    "submissions": [
+      {
+        "id": "sub-1794981852453-0a92a0",
+        "invoiceId": "inv-1794981852444-f9432f",
+        "invoiceNumber": "RDC-INV-2026-001",
+        "patientEmail": "hafismohammed73@gmail.com",
+        "patientName": "Hafis Mohammed K",
+        "amount": 650,
+        "currency": "INR",
+        "transactionReference": "123456789012",
+        "paymentDate": "2026-11-18",
+        "paymentApp": "PhonePe",
+        "status": "VERIFIED",
+        "submittedAt": "2026-11-18T06:04:12.453Z",
+        "reviewedAt": "2026-11-18T06:04:12.461Z",
+        "reviewedBy": "doctor@clinic.com",
+        "reviewedByName": "Dr. Raihan"
+      }
+    ],
+    "receipt": {
+      "receiptNumber": "RDC-REC-2026-001",
+      "invoiceId": "inv-1794981852444-f9432f",
+      "invoiceNumber": "RDC-INV-2026-001",
+      "patientEmail": "hafismohammed73@gmail.com",
+      "patientName": "Hafis Mohammed K",
+      "dentistEmail": "doctor@clinic.com",
+      "dentistName": "Dr. Raihan",
+      "amount": 650,
+      "currency": "INR",
+      "paymentMethod": "UPI",
+      "upiId": "Q288159952@ybl",
+      "transactionReference": "123456789012",
+      "paymentDate": "2026-11-18",
+      "verificationDate": "2026-11-18T06:04:12.461Z",
+      "verifiedBy": "doctor@clinic.com",
+      "verifiedByName": "Dr. Raihan",
+      "status": "VERIFIED",
+      "consultationDetails": "Root Canal Treatment (RCT) - Biomechanical Preparation"
+    }
+  }
+]

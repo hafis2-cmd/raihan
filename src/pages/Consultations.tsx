@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Stethoscope, 
@@ -11,7 +12,8 @@ import {
   Clock, 
   X, 
   Printer, 
-  FileCheck
+  FileCheck,
+  CreditCard
 } from 'lucide-react';
 import { useAuth, getRegisteredPatients, getRegisteredUsers } from '../context/AuthContext';
 import { 
@@ -29,6 +31,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function Consultations() {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const isDentist = profile?.role === 'Doctor' || profile?.role === 'Dentist';
 
@@ -396,6 +399,19 @@ export default function Consultations() {
                     <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">Date</span>
                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{cons.consultation_date}</span>
                   </div>
+                  <button
+                    onClick={() => {
+                      if (isDentist) {
+                        navigate('/payments', { state: { patientEmail: cons.patient_email, patientName: cons.patient_name, openAssign: true } });
+                      } else {
+                        navigate('/payments');
+                      }
+                    }}
+                    className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                    title={isDentist ? "Assign / View Consultation Fee" : "View Consultation Invoices"}
+                  >
+                    <CreditCard className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </button>
                   <button
                     onClick={() => handlePrint(cons)}
                     className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
